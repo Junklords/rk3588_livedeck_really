@@ -10,7 +10,7 @@ This repository documents the reverse-engineered device trees for the Really TVI
 | --- | --- | --- |
 | `dts-5.10-android` | Android 12 / vendor 5.10 | FIQ debugger, Android boot arguments and vendor devices |
 | `dts-6.1-linux` | Armbian / vendor 6.1 | Normal UART2 console and vendor Linux peripheral stack |
-| `dts-7.3-linux` | Linux 7.3 mainline | Mainline MMC, PCIe, USB, VOP2, eDP, DSI and HDMI bindings |
+| `dts-7.3-linux` | Linux 7.3 mainline | Mainline MMC, PCIe, USB, VOP2, NPU, RGA, VPU/VEPU, RKVDEC and AV1 |
 | `dtb-5.10-android` | Factory DTB | Original extracted DTB only |
 
 Factory DTB:
@@ -37,10 +37,11 @@ SHA256: D516E8F62CE040E76CAB2CBC394DBE46AB53F3F82E9CEC1ED8E5714F51358521
 | Audio | ES8388 on I2S1, HDMI1 audio, DP0 audio |
 | RTC | HYM8563 at I2C4 `0x51` |
 | Touch | Goodix GT9110 at I2C4 `0x14` |
-| HDMI input | LT6911UXC2 at I2C6 `0x2b` |
+| HDMI input | RK3588 built-in HDMI RX with GPIO4_C6 HPD/detect; LT6911UXC2 at I2C6 `0x2b` |
 | Camera | IMX577 at I2C4 `0x1a` |
 | Wireless | AP6275P Wi-Fi and Bluetooth |
 | Fan | PWM2, 40 kHz, inverted output |
+| Watchdog | Internal RK3588 DW watchdog and external GPIO0_D3 watchdog are both explicitly disabled |
 
 ## Hardware Topology
 
@@ -82,6 +83,16 @@ VOP2 VP2 --> eDP0 -> eDP panel
 VOP2 VP3 --> DSI1 4-lane -> LT9211 -> LVDS -> 1920x1080 panel
 ```
 
+HDMI input paths:
+
+```text
+HDMI IN --> RK3588 built-in HDMI RX --> V4L2 capture
+HDMI audio --> I2S7 --> rockchip,hdmiin sound card
+
+LT6911UXC2 secondary path:
+HDMI IN --> LT6911UXC2 --> MIPI DPHY0 --> MIPI CSI2 #2 --> RKCIF2
+```
+
 Storage and high-speed links:
 
 ```text
@@ -107,6 +118,10 @@ SATA0 / PCIe3 -> disabled
 | LVDS backlight enable | GPIO3_B4 | High | PWM backlight |
 | LVDS power enable | GPIO3_B6 | High | LVDS panel supply |
 | HDMI1 enable | GPIO3_C5 | High | HDMI1 |
+| HDMI RX HPD/detect | GPIO4_C6 | Low | Built-in `hdmi_receiver` |
+| LT6911 reset | GPIO3_A7 | High | LT6911UXC2 reset |
+| LT6911 HPD control | GPIO2_C3 | High | LT6911UXC2 HPD control |
+| LT6911 interrupt | GPIO1_C7 | Low | LT6911UXC2 interrupt |
 | PCIe lane 2 reset | GPIO3_C7 | High | `pcie2x1l2` |
 | PCIe lane 1 reset | GPIO1_A7 | High | `pcie2x1l1` |
 | SD power | GPIO4_C3 | High | `vcc_sd` |
@@ -127,6 +142,14 @@ SATA0 / PCIe3 -> disabled
 
 The 7.3 tree uses the standard `pwm-fan` binding with cooling levels `0/76/153/204` and package thermal cooling maps.
 
+## Watchdog State
+
+Really includes an external GPIO-controlled watchdog. The factory DTB uses GPIO0_D3, level-mode servicing and a 500 ms hardware margin. All three rebuilt trees explicitly set this device to `disabled`.
+
+The RK3588 internal DW watchdog at `watchdog@feaf0000` is also explicitly disabled in all three trees to match the factory DTB. No `/dev/watchdog` is registered, so the device tree does not create an implicit dependency on a userspace watchdog service.
+
+If watchdog support is enabled later, use only the internal or external device and configure systemd `RuntimeWatchdogSec` or a dedicated watchdog daemon.
+
 ## Status Policy
 
 The factory DTB explicitly enables the PMIC and CPU rails, eMMC, SD, GMAC0, both PCIe 2.0 x1 links, USB2/USB3, Type-C, VOP2, DSI1/LT9211/LVDS, eDP0, HDMI1, DP0, ES8388, RTC, touch and fan.
@@ -135,7 +158,7 @@ It also enables the board-independent RK3588 media and accelerator blocks, inclu
 
 SDIO, SATA0, PCIe 3.0, `pcie2x1l0`, HDMI0, DP1, eDP1 and DSI0 are disabled or unused.
 
-The vendor 5.10 and 6.1 trees retain the vendor media and accelerator nodes. Linux 7.3 mainline does not expose compatible NPU/RGA/JPEG/VENC/VDEC/RKCIF/RKISP device-tree bindings, so those nodes are not fabricated in the mainline tree.
+The vendor 5.10 and 6.1 trees retain the vendor media and accelerator nodes, including the LT6911UXC2 -> DPHY0 -> MIPI CSI2 -> RKCIF2 path. The 7.3 mainline tree uses its own bindings to explicitly enable all three RKNN NPU cores, RGA3/RGA2, VPU121, four VEPU121 JPEG encoders, RKVDEC0/1, AV1 decoding and their IOMMUs. LT6911UXC2 and its mainline VICAP graph are present, but UXC2 driver compatibility still needs validation.
 
 ## Linux 7.3 Mainline Port
 
@@ -148,14 +171,19 @@ The vendor 5.10 and 6.1 trees retain the vendor media and accelerator nodes. Lin
 - both PCIe 2.0 x1 links with their combphy, reset and 3.3 V resources;
 - USB2/DP/USB3 PHYs, DWC3 controllers and HUSB311 Type-C role switching;
 - four VOP2 display routes for HDMI1, DP0, eDP0 and DSI1;
+- the built-in `hdmi_receiver`, its 160 MiB CMA region, GPIO4_C6 HPD and HDMI RX pinmux;
+- LT6911UXC2, its 27 MHz clock, GPIO3_A7 reset, GPIO2_C3 HPD, GPIO1_C7 interrupt and `csi_dphy0 -> csi2 -> vicap` graph;
+- `rknn_core_0/1/2`, their IOMMUs, the `vdd_npu_s0` rails and the `pd_npu` domain;
+- `rga3_core0/1`, dual-core RGA2, VPU121, four `vepu121_0..3` JPEG encoders, `vdec0/1` and AV1 decoding;
+- mainline VDENC/RKVDEC power-domain supplies from `vdd_vdenc_s0`;
 - LT9211 DSI-to-LVDS, GT9110 touch, HYM8563 RTC and ES8388 audio;
 - PWM2 fan, PWM6 eDP backlight and PWM12 LVDS backlight;
 - SARADC keys, thermal protection and fan cooling maps.
 
 ## Known Limitations
 
-1. Mainline 7.3 does not provide the vendor NPU/RGA/JPEG/VENC/VDEC/RKCIF/RKISP driver stack used by this board.
-2. AP6275P wireless, IMX577 capture and LT6911UXC2 HDMI input still require matching mainline drivers.
+1. Linux 7.3 enables the available mainline NPU, RGA, JPEG encoder, VPU decoder, RKVDEC and AV1 nodes. RK3588 RKCIF/RKISP capture nodes and standalone RKVENC device nodes are not provided by this mainline release.
+2. AP6275P wireless and IMX577 capture remain limited by mainline driver support. The built-in HDMI RX path is restored, and the LT6911UXC2 graph is restored, but Linux 7.3 only provides an LT6911UXE driver; UXC2 compatibility or a dedicated driver backport still needs validation.
 3. The eDP panel path depends on EDID. A panel without EDID needs explicit timings.
 4. LT9211 timings, Type-C/DP Alt Mode and external ES8388 amplifier controls still require hardware validation.
 5. The device tree describes kernel hardware only. Booting also requires a matching loader, U-Boot, memory initialization and root filesystem.

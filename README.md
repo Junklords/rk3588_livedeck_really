@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | `dts-5.10-android` | Android 12 / vendor 5.10 | FIQ debugger、Android 启动参数、vendor 媒体与加速节点 |
 | `dts-6.1-linux` | Armbian / vendor 6.1 | 普通 UART2 控制台、Linux 根设备与 vendor 外设栈 |
-| `dts-7.3-linux` | Linux 7.3 mainline | mainline MMC、PCIe、USB、VOP2、eDP、DSI、HDMI binding |
+| `dts-7.3-linux` | Linux 7.3 mainline | mainline MMC、PCIe、USB、VOP2、NPU、RGA、VPU/VEPU、RKVDEC、AV1 |
 | `dtb-5.10-android` | 工厂原始 DTB | 只保存提取文件，不保存任何重建产物 |
 
 工厂 DTB：
@@ -37,11 +37,11 @@ SHA256: D516E8F62CE040E76CAB2CBC394DBE46AB53F3F82E9CEC1ED8E5714F51358521
 | 音频 | ES8388 + I2S1，HDMI1 音频，DP0 音频 |
 | RTC | HYM8563，I2C4 `0x51`，GPIO0_B0 中断 |
 | 触摸 | Goodix GT9110，I2C4 `0x14` |
-| HDMI 输入 | LT6911UXC2，I2C6 `0x2b` |
+| HDMI 输入 | RK3588 内置 HDMI RX，HPD/检测 GPIO4_C6；LT6911UXC2，I2C6 `0x2b` |
 | MIPI 摄像头 | IMX577，I2C4 `0x1a` |
 | 无线 | AP6275P，Wi-Fi + Bluetooth |
 | 风扇 | PWM2，40 kHz，反相输出 |
-| 看门狗 | 外部 GPIO watchdog，GPIO0_D3 |
+| 看门狗 | 内部 RK3588 DW watchdog 与外部 GPIO watchdog GPIO0_D3 均显式禁用 |
 
 ## 硬件拓扑
 
@@ -89,6 +89,16 @@ VOP2 VP2 --> eDP0 --> eDP panel
 VOP2 VP3 --> DSI1 4-lane --> LT9211 --> LVDS 24-bit --> 1920x1080 panel
 ```
 
+HDMI 输入：
+
+```text
+HDMI IN --> RK3588 built-in HDMI RX --> V4L2 capture
+HDMI audio --> I2S7 --> rockchip,hdmiin sound card
+
+Lontium LT6911UXC2 secondary path:
+HDMI IN --> LT6911UXC2 --> MIPI DPHY0 --> MIPI CSI2 #2 --> RKCIF2
+```
+
 存储与扩展：
 
 ```text
@@ -108,7 +118,7 @@ SATA0 / PCIe3 --> disabled
 | --- | --- | --- | --- |
 | Type-C PD 中断 | GPIO0_D7 | Low | HUSB311 interrupt |
 | RTC 中断 | GPIO0_B0 | Low | HYM8563 interrupt |
-| 外部看门狗 | GPIO0_D3 | - | GPIO watchdog power |
+| 外部看门狗 | GPIO0_D3 | High | SGM760B GPIO watchdog，显式禁用 |
 | 触摸 reset | GPIO1_D3 | Low | GT9110 `reset-gpios` |
 | eDP 面板 enable | GPIO1_D0 | High | eDP panel `enable-gpios` |
 | 触摸中断 | GPIO4_B0 | Low | GT9110 interrupt |
@@ -117,6 +127,10 @@ SATA0 / PCIe3 --> disabled
 | LVDS 背光 enable | GPIO3_B4 | High | PWM backlight enable |
 | LVDS 电源 enable | GPIO3_B6 | High | LVDS panel power |
 | HDMI1 enable | GPIO3_C5 | High | HDMI1 power/enable |
+| HDMI RX HPD/检测 | GPIO4_C6 | Low | Built-in `hdmirx`/`hdmi_receiver` |
+| LT6911 reset | GPIO3_A7 | High | LT6911UXC2 `reset-gpios` |
+| LT6911 HPD control | GPIO2_C3 | High | LT6911UXC2 `hpd-ctl-gpios` |
+| LT6911 interrupt | GPIO1_C7 | Low | LT6911UXC2 interrupt |
 | PCIe lane 2 reset | GPIO3_C7 | High | `pcie2x1l2` |
 | PCIe lane 1 reset | GPIO1_A7 | High | `pcie2x1l1` |
 | SD 卡电源 | GPIO4_C3 | High | `vcc_sd` |
@@ -147,6 +161,14 @@ SATA0 / PCIe3 --> disabled
 
 7.3 版本将风扇描述为标准 `pwm-fan`，冷却级数为 `0/76/153/204`，并保留 package thermal 的两级主动散热策略。
 
+## 看门狗状态
+
+Really 额外包含一个 GPIO 控制的外部看门狗，工厂 DTB 使用 GPIO0_D3、Level 型喂狗和 500 ms 硬件裕量。三套重建 DTS 均将其显式写为 `status = "disabled"`。
+
+RK3588 内部 DW watchdog `watchdog@feaf0000` 也按原厂状态在三套 DTS 中显式设为 `status = "disabled"`。因此当前设备树不注册 `/dev/watchdog`，不会与用户态喂狗服务产生隐式依赖。
+
+如果后续需要启用，应只选择内部或外部其中一种，并同时配置 systemd `RuntimeWatchdogSec` 或专用 watchdog daemon。
+
 ## DTS 状态策略
 
 工厂 FDT 中明确启用的启动相关节点包括：
@@ -155,6 +177,7 @@ SATA0 / PCIe3 --> disabled
 - eMMC、SD、GMAC0、PCIe 2.0 lane 1/lane 2；
 - USB3 OTG0/Host1、USB2 Host0/1、HUSB311 Type-C；
 - VOP2、DSI1/LT9211/LVDS、eDP0、HDMI1、DP0；
+- RK3588 内置 HDMI RX、GPIO4_C6 HPD/检测和 I2S7 HDMI-in 音频；
 - ES8388、HDMI1 音频、RTC、触摸、风扇；
 - NPU、RGA2/RGA3、JPEG、VENC/VDEC、IEP、AV1、MPP、RKCIF/RKISP 等 SoC 节点。
 
@@ -164,7 +187,7 @@ SATA0 / PCIe3 --> disabled
 - HDMI0、DP1、eDP1、DSI0；
 - 不属于本板 BOM 的额外 PCIe/SATA/显示组合。
 
-5.10 与 6.1 版本保留 vendor 媒体和加速节点。7.3 mainline 没有对应的 NPU/RGA/JPEG/VENC/VDEC/RKCIF/RKISP 设备树 binding，因此不会伪造不存在的 mainline 节点；这些设备只保留在 vendor DTS 中。
+5.10 与 6.1 版本保留 vendor 媒体和加速节点，并启用 LT6911UXC2 → DPHY0 → MIPI CSI2 → RKCIF2 采集链路。7.3 mainline 使用自身 binding，显式启用三核 RKNN NPU、RGA3/RGA2、VPU121、四核 VEPU121 JPEG 编码、RKVDEC0/1 和 AV1 解码及其 IOMMU；LT6911UXC2 已按 mainline VICAP graph 写入设备树，但该版本内核仍需确认 UXC2 驱动兼容性。
 
 ## Linux 7.3 移植内容
 
@@ -177,14 +200,19 @@ SATA0 / PCIe3 --> disabled
 - PCIe 2.0 lane 1/lane 2、对应的 combphy 资源、reset 与 3.3 V 供电；
 - USB2/DP/USB3 PHY、DWC3、HUSB311 Type-C 角色切换；
 - VOP2 到 HDMI1、DP0、eDP0、DSI1 的四条显示通路；
+- `hdmi_receiver` 内置 HDMI RX、160 MiB CMA、GPIO4_C6 HPD 和 HDMI RX pinmux；
+- LT6911UXC2、27 MHz 外部时钟、GPIO3_A7 reset、GPIO2_C3 HPD、GPIO1_C7 中断，以及 `csi_dphy0 → csi2 → vicap` graph；
+- `rknn_core_0/1/2` 三核 NPU、对应 IOMMU、`vdd_npu_s0` 与 `pd_npu` 电源域；
+- `rga3_core0/1`、双核 RGA2、VPU121、`vepu121_0..3` JPEG 编码、`vdec0/1` 和 AV1 解码；
+- VDENC/RKVDEC 电源域与 `vdd_vdenc_s0` 的 mainline 供电绑定；
 - LT9211 DSI→LVDS、GT9110 触摸、HYM8563 RTC、ES8388 声卡；
 - PWM2 风扇、PWM6 eDP 背光、PWM12 LVDS 背光；
 - SARADC 与 GPIO 按键、温度保护和风扇冷却映射。
 
 ## 已知限制
 
-1. mainline 7.3 尚无本板所需 vendor NPU/RGA/JPEG/VENC/VDEC/RKCIF/RKISP 栈，相关板级状态只在 5.10/6.1 生效。
-2. AP6275P 无线、IMX577 摄像头和 LT6911UXC2 HDMI 输入仍需匹配的 mainline 驱动后才能启用。
+1. 7.3 已启用 mainline 提供的 NPU、RGA、JPEG 编码、VPU 解码、RKVDEC 和 AV1 节点；RKCIF/RKISP 采集链与独立 RKVENC 节点在该版本的 RK3588 DTSI 中尚未提供。
+2. AP6275P 无线和 IMX577 摄像头仍受 mainline 驱动支持范围限制；内置 HDMI RX 已恢复，LT6911UXC2 DTS graph 已恢复，但 Linux 7.3 仅提供 LT6911UXE 驱动，仍需验证兼容性或回移专用驱动。
 3. eDP 面板依赖 EDID；若实际屏体没有 EDID，需要在 `aux-bus/panel` 内补充面板时序。
 4. LT9211 输出时序、Type-C/DP Alt Mode 和 ES8388 外部功放控制仍需实机验证。
 5. 设备树只描述内核侧硬件，正式启动仍依赖匹配的 loader、U-Boot、内存初始化和根文件系统。
