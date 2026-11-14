@@ -67,7 +67,7 @@
 
 	backlight_lvds: backlight-lvds {
 		compatible = "pwm-backlight";
-		status = "okay";
+		status = "disabled";
 		brightness-levels = <0 20 21 22 24 26 28 31 34 38 42 47 52 58 65
 				     72 80 89 99 110 122 135 150 166 184 204 226 255>;
 		default-brightness-level = <20>;
@@ -106,17 +106,6 @@
 		clock-frequency = <27000000>;
 		clock-output-names = "CLK_CAMERA_27MHZ";
 		#clock-cells = <0>;
-	};
-
-	hdmi1-con {
-		compatible = "hdmi-connector";
-		type = "a";
-
-		port {
-			hdmi1_con_in: endpoint {
-				remote-endpoint = <&hdmi1_out_con>;
-			};
-		};
 	};
 
 	hdmi1-sound {
@@ -163,7 +152,7 @@
 
 	lvds_panel: panel-lvds {
 		compatible = "panel-lvds";
-		status = "okay";
+		status = "disabled";
 		backlight = <&backlight_lvds>;
 		data-mapping = "vesa-24";
 		height-mm = <194>;
@@ -364,7 +353,8 @@
 };
 
 &dsi1 {
-	status = "okay";
+	/* LT9211 bridge driver missing in vendor 6.1; disabled so rockchip-drm can bind with HDMI alone. */
+	status = "disabled";
 
 	ports {
 		#address-cells = <1>;
@@ -381,7 +371,7 @@
 };
 
 &dsi1_in_vp3 {
-	status = "okay";
+	status = "disabled";
 };
 
 &edp0 {
@@ -425,20 +415,29 @@
 	pinctrl-0 = <&hdmim2_tx1_cec &hdmim0_tx1_hpd
 		     &hdmim2_tx1_scl &hdmim2_tx1_sda>;
 	enable-gpios = <&gpio3 RK_PC5 GPIO_ACTIVE_HIGH>;
+	/*
+	 * Factory DTB forces HDMI output (HPD line is not wired to the SoC).
+	 * vendor 6.1 dw_hdmi_qp uses force-output + force_timing (1080p60).
+	 */
+	force-output;
 	status = "okay";
 
-	ports {
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		port@1 {
-			reg = <1>;
-
-			hdmi1_out_con: endpoint {
-				remote-endpoint = <&hdmi1_con_in>;
-			};
-		};
+	force_timing: force_timing {
+		clock-frequency = <148500000>;
+		hactive = <1920>;
+		hfront-porch = <88>;
+		hsync-len = <44>;
+		hback-porch = <148>;
+		vactive = <1080>;
+		vfront-porch = <4>;
+		vsync-len = <5>;
+		vback-porch = <36>;
+		hsync-active = <1>;
+		vsync-active = <1>;
+		de-active = <0>;
+		pixelclk-active = <0>;
 	};
+
 };
 
 &hdmi1_in_vp0 {
@@ -540,7 +539,7 @@
 	lt9211: bridge@2d {
 		compatible = "lontium,lt9211";
 		reg = <0x2d>;
-		status = "okay";
+		status = "disabled";
 		reset-gpios = <&gpio3 RK_PA6 GPIO_ACTIVE_HIGH>;
 		vccio-supply = <&vcc_1v8_s3>;
 
@@ -802,9 +801,10 @@
 	};
 };
 
+/* pinctrl comes from the dtsi default ("active" + pwm12m0_pins); overriding
+ * the name to "default" broke the pwm chip registration and, by way of the
+ * deferred backlight and panel, held up the whole rockchip-drm aggregate. */
 &pwm12 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pwm12m0_pins>;
 	status = "okay";
 };
 
@@ -930,7 +930,7 @@
 
 &route_dsi1 {
 	connect = <&vp3_out_dsi1>;
-	status = "okay";
+	status = "disabled";
 };
 
 &route_edp0 {
@@ -1006,8 +1006,9 @@
 	status = "okay";
 };
 
+/* UART0 pins (m2) collide with SPI2-CS0 (gpio0-9) wired to the RK806 PMIC. */
 &uart0 {
-	status = "okay";
+	status = "disabled";
 };
 
 &uart2 {
