@@ -1,0 +1,44 @@
+gpiochip0: GPIOs 0-31, parent: platform/fd8a0000.gpio, gpio0:
+ gpio-0   (                    |bt_default_wake_host) in  lo 
+ gpio-16  (                    |vcc1v8-sys          ) out hi 
+ gpio-21  (                    |bt_default_wake     ) in  lo 
+ gpio-22  (                    |bt_default_reset    ) out lo 
+
+gpiochip1: GPIOs 32-63, parent: platform/fec20000.gpio, gpio1:
+ gpio-34  (                    |mipi-cam-pwen       ) out hi 
+ gpio-42  (                    |sbu2-dc             ) out lo 
+ gpio-46  (                    |linein-det          ) in  lo 
+ gpio-56  (                    |enable              ) out hi 
+ gpio-57  (                    |vbus5v0-typec       ) out hi 
+ gpio-59  (                    |GTP_RST_PORT        ) in  hi 
+
+gpiochip2: GPIOs 64-95, parent: platform/fec30000.gpio, gpio2:
+ gpio-83  (                    |hpd-ctl             ) out lo 
+ gpio-84  (                    |snps,reset          ) out hi ACTIVE LOW
+ gpio-85  (                    |vcc-5g-module-rst   ) out hi 
+
+gpiochip3: GPIOs 96-127, parent: platform/fec40000.gpio, gpio3:
+ gpio-96  (                    |sbu1-dc             ) out lo 
+ gpio-101 (                    |vcc5v0-host         ) out hi 
+ gpio-102 (                    |?                   ) out hi 
+ gpio-103 (                    |reset               ) out lo 
+ gpio-107 (                    |vcc3v3-pcie         ) out hi 
+ gpio-108 (                    |?                   ) out lo 
+ gpio-110 (                    |lvds-pwr-en         ) out hi 
+ gpio-111 (                    |reset               ) out hi 
+ gpio-114 (                    |bt_default_rts      ) in  hi 
+ gpio-117 (                    |enable              ) out hi 
+ gpio-120 (                    |power-on-led        ) out lo 
+ gpio-125 (                    |vcc-5g-dpr-ctl      ) out lo 
+
+gpiochip4: GPIOs 128-159, parent: platform/fec50000.gpio, gpio4:
+ gpio-134 (                    |vcc5v0-usb          ) out hi 
+ gpio-136 (                    |GTP_INT_IRQ         ) in  hi 
+ gpio-138 (                    |spk-con             ) out hi ACTIVE LOW
+ gpio-139 (                    |hp-det              ) in  lo 
+ gpio-140 (                    |hp-con              ) out lo 
+ gpio-142 (                    |enable              ) out lo 
+ gpio-147 (                    |sdmmc-regulator     ) out lo 
+ gpio-150 (                    |hdmirx-det          ) in  hi ACTIVE LOW
+
+gpiochip5: GPIOs 509-511, parent: platform/rk806-pinctrl.1.auto, rk806-gpio, can sleep:

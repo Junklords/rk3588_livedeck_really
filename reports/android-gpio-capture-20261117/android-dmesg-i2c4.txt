@@ -1,0 +1,1 @@
+[    7.108521] input: goodix-ts as /devices/platform/feac0000.i2c/i2c-4/4-0014/input/input6

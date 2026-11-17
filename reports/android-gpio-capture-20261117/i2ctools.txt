@@ -1,0 +1,6 @@
+/system/bin/i2cdetect
+/system/bin/i2cdump
+/vendor/bin/i2cdetect
+/vendor/bin/i2cdump
+/vendor/bin/i2cget
+/vendor/bin/i2cset

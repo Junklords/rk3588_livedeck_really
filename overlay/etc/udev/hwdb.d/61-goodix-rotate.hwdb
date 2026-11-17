@@ -1,0 +1,7 @@
+# Really TVI2340R 内屏触摸校准 (2026-11-17 实机验证)
+# 面板物理竖装(触摸原生1080x1920), LT9211 扫描1920x1080横屏(rotation=270)
+# 实测有效矩阵: 0 1 0 -1 0 1
+id-input:i2c:v0416p2396:name:Goodix Capacitive TouchScreen:*
+ LIBINPUT_CALIBRATION_MATRIX=0 1 0 -1 0 1
+libinput:name:Goodix Capacitive TouchScreen
+ LIBINPUT_CALIBRATION_MATRIX=0 1 0 -1 0 1

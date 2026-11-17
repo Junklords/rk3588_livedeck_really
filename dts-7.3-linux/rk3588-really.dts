@@ -890,7 +890,7 @@
 };
 
 &i2c4 {
-	clock-frequency = <400000>;
+	clock-frequency = <100000>; /* 工厂基准; 400kHz 本机全设备 NAK(2026-11-17 位摆对照) */
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c4m1_xfer>;
 	status = "okay";
@@ -919,7 +919,8 @@
 	lt9211: bridge@2d {
 		compatible = "lontium,lt9211";
 		reg = <0x2d>;
-		reset-gpios = <&gpio3 RK_PA6 GPIO_ACTIVE_HIGH>;
+		/* reset-gpios 移除: enable 期复位脉冲使芯片脱离总线(2026-11-17 实测);
+		 * A6 由 &gpio3 lt9211-rst-hold-hog 恒高维持(安卓同款稳态) */
 		status = "okay";
 		vccio-supply = <&vcc_1v8_s3>;
 
@@ -1404,6 +1405,16 @@
 	};
 };
 
+
+/* LT9211 复位恒高: 芯片不接受上电后复位脉冲; 安卓恒高稳态 */
+&gpio3 {
+	lt9211-rst-hold-hog {
+		gpio-hog;
+		gpios = <RK_PA6 GPIO_ACTIVE_HIGH>;
+		output-high;
+		line-name = "lt9211-rst-hold";
+	};
+};
 
 &pwm12 {
 	pinctrl-names = "default";
