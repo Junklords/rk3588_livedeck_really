@@ -4,7 +4,7 @@ Author: Codex (GPT-5); executor: user
 
 Generated: 2026-11-14T21:50:00+08:00
 
-Last updated: 2026-11-15T21:45:00+08:00
+Last updated: 2026-11-17T23:55:00+08:00
 
 Context: Board-level hardware enablement and validation on the Really
 TVI2340R, starting from the reconstructed vendor DTB and the mainline
@@ -146,6 +146,11 @@ release suffix.
   Mutter presents a 1080x1920 logical desktop.
 - The early kernel console does not consume panel orientation, so board
   bootargs add `fbcon=rotate:3` to rotate fbcon as well.
+- Android boot avoids the equivalent early landscape frame by setting
+  `ro.surface_flinger.primary_display_orientation=ORIENTATION_270` at
+  SurfaceFlinger startup. The layered Android/Linux comparison and deferred
+  optimization candidates are recorded in
+  `../reports/display-orientation-android-vs-linux-20261117/README.md`.
 - LVDS panel supply enable is GPIO3_B6, active high and always-on.
 - LVDS backlight enable is GPIO3_B4; PWM is PWM12 with normal polarity.
 - This panel's brightness decreases as the PWM high-level duty cycle rises.

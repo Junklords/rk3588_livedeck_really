@@ -11,6 +11,10 @@ Linux 7.3 的当前板级改动和实测边界见
 进度回填规则见
 [`reports/audio-mic-linein-20261117/README.md`](reports/audio-mic-linein-20261117/README.md)。
 
+Android 与原厂 5.10 的显示方向匹配机制、Linux 7.3 横屏闪现原因和后续
+优化顺序见
+[`reports/display-orientation-android-vs-linux-20261117/README.md`](reports/display-orientation-android-vs-linux-20261117/README.md)。
+
 当前完整状态、触控 Android 基线和群友 AI 接手顺序见
 [`docs/AI-HANDOVER-CHECKLIST-20261115.md`](docs/AI-HANDOVER-CHECKLIST-20261115.md)。
 
