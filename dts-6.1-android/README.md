@@ -118,6 +118,7 @@ sha256 952c21b31e730c09f302b4db3fdca9eeb1e63540c125faf301a1beedcde12575
 `lontium,lt6911uxc2` 在目标 vendor 树中仍没有完全匹配的 compatible。
 在补到对应 UXC2 驱动前，隐藏 HDMI IN 路径只能视为“DTS 已描述、驱动未闭环”。
 
-合并前还需确认目标 config 已启用 LT9211/LVDS panel、STK8BA50、
-AT24 EEPROM、Rockchip PDM/DMIC、HYM8563 和 HUSB311。当前 vendor
-`rockchip_linux_defconfig` 并未覆盖这里新增的全部外设。
+合并前还需确认目标 config 已启用 LT9211/LVDS panel、Rockchip
+PDM/DMIC、HYM8563 和 HUSB311。Really 板级配置将 STK8BA50 设为 `y`。
+AT24 EEPROM 保持可选；当前机器的 `0x56` 不 ACK。Type-C Sink 与 Source
+都声明固定 5V/3A PDO。

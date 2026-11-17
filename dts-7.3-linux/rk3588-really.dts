@@ -1026,12 +1026,13 @@
 			compatible = "usb-c-connector";
 			label = "USB-C";
 			data-role = "dual";
-			/* The one-cable monitor supplies VBUS over USB-C PD. */
-			power-role = "sink";
+			/* Support both a powered monitor and a powered USB-C dock. */
+			power-role = "dual";
 			try-power-role = "sink";
 			pd-revision = /bits/ 8 <0x2 0x0 0x1 0x2>;
-			sink-pdos = <PDO_FIXED(5000, 1000, PDO_FIXED_USB_COMM)>;
-			op-sink-microwatt = <1000000>;
+			sink-pdos = <PDO_FIXED(5000, 3000, PDO_FIXED_USB_COMM)>;
+			source-pdos = <PDO_FIXED(5000, 3000, PDO_FIXED_USB_COMM)>;
+			op-sink-microwatt = <15000000>;
 
 			altmodes {
 				displayport {
@@ -1723,7 +1724,10 @@
 };
 
 &u2phy0_otg {
-	phy-supply = <&vbus5v0_typec>;
+	/*
+	 * HUSB311 owns VBUS through vbus-supply. Binding the same regulator
+	 * as phy-supply keeps VBUS on when the port is a sink.
+	 */
 	status = "okay";
 };
 

@@ -70,6 +70,12 @@ quality remain open. See `../reports/audio-mic-linein-20261117/README.md`.
   edge kernel configuration.
 - Type-C PD/mux is provided by HUSB311/RT1711H.
 - Type-C VBUS enable is GPIO1_D1, active high.
+- The connector advertises dual power and data roles. It prefers sink for a
+  powered monitor and can source 5 V to a dock.
+- Both sink and source advertise one fixed 5 V/3 A PDO. Operational sink
+  power is 15 W.
+- HUSB311 owns VBUS through `vbus-supply`. `u2phy0_otg` must not bind the
+  same regulator as `phy-supply`.
 - USB-A host power is controlled from GPIO3_A5.
 - DP uses two Type-C lanes while USB3 uses the other two lanes.
 
@@ -111,8 +117,16 @@ release suffix.
 - The STK8BAXX accelerometer is on I2C6 address `0x18`.
 - IRQ is GPIO4_B7.
 - It uses the upstream `sensortek,stk8ba50` IIO driver.
+- The Really board config builds `CONFIG_STK8BA50=y`.
 - Runtime manual instantiation produced an `stk8ba50` IIO device and live
   X/Y/Z readings.
+- Identity axes make `iio-sensor-proxy` report upright as `bottom-up`.
+  A udev mount matrix `1,0,0;0,-1,0;0,0,1` makes upright report `normal`.
+- GNOME 50 in this image has no `gsd-orientation` service. A per-user
+  `really-auto-rotate.service` applies temporary Mutter transforms to LVDS-1.
+- The transform map is `normal=0`, `left-up=1`, `bottom-up=2`, `right-up=3`.
+  External monitors are not changed. The user orientation lock remains enabled
+  as a manual override.
 - The 7.3 DTS now contains `accelerometer@18` and its pinctrl entry.
 - Automatic USB-camera rotation is not implemented. The current camera keeps
   a fixed GStreamer `videoflip` direction; any gravity-following behavior must
@@ -313,11 +327,15 @@ They are now synchronized locally:
 - `power_on_led`, with GPIO3_D0 pinctrl and disabled boot state.
 
 `vcc28_dvp` now derives from `vcc4v0_sys`. The HUSB311 interrupt was corrected
-to GPIO0_B7, `u2phy0_otg` gained its VBUS supply, and AP6275P host-wake was
-added on GPIO0_B2.
+to GPIO0_B7. HUSB311 owns Type-C VBUS, and AP6275P host-wake was added on
+GPIO0_B2.
 
-I2C4 `0x56` now exposes the 24C04 EEPROM and I2C6 `0x18` exposes the STK8BA50
-accelerometer. Both mainline drivers exist in this tree.
+I2C6 `0x18` exposes the STK8BA50 accelerometer. The board config builds its
+driver into the kernel.
+
+I2C4 `0x56` matches the factory 24C04 EEPROM node. The chip does not ACK on the
+current unit. No bus, address or compatible mismatch is known. Treat the
+EEPROM as absent for now.
 
 The default product camera is USB UVC. The IMX577 MIPI camera interface is
 on the core board rather than the carrier board. Linux 7.3 currently has no
@@ -325,11 +343,25 @@ mainline IMX577 sensor driver, so no enabled IMX577 node or
 CSI0 capture path is enabled in 7.3.
 
 The factory DTB provides no label, nvmem cell, EDID or MAC consumer for the
-24C04, so its payload must be read before claiming a purpose. Do not write it.
+24C04. Do not rely on it until a future unit ACKs at `0x56`.
 
 Validation:
 
 ```text
-7.3 DTB: 120135 bytes
-SHA256:  0b6cc777e458dc8609b17472645a5fff3c6400978e441ce91ed83e4564e45512
+7.3 DTB: 213085 bytes
+SHA256:  d7fe7721b1ea819dbf7984d54d056dca89b797b899825216904a6f392a243f93
+```
+
+Runtime validation on 2026-11-17:
+
+```text
+kernel: 7.3.5-edge-rockchip64 #75
+root:   /dev/mmcblk1p1
+CONFIG_STK8BA50=y
+IIO:    stk8ba50 bound without modprobe
+matrix: 1,0,0;0,-1,0;0,0,1
+pose:   normal, vertical
+lock:   false
+rotate: normal=0, left-up=1, bottom-up=2, right-up=3
+Type-C: sink-pdos=source-pdos=0x401912c (5 V / 3 A)
 ```

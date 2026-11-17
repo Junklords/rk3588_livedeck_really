@@ -309,5 +309,6 @@ CONFIG_TYPEC_HUSB311=y
 ```
 
 这些选项中，当前 `rockchip_linux_defconfig` 已包含 PDM、HYM8563、
-HUSB311 和 LT6911UXC；LT9211、LVDS panel、STK8BA50、AT24
-仍需在最终板级 config 中确认，不能只靠 DTB 编译通过。
+HUSB311 和 LT6911UXC。Really 板级配置将 STK8BA50 设为 `y`。LT9211、
+LVDS panel 仍需在最终板级 config 中确认。AT24 保持可选；当前机器的
+`0x56` 不 ACK。Type-C Sink 与 Source 都声明固定 5V/3A PDO。

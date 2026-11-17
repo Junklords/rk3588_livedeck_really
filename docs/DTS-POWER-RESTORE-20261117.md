@@ -215,8 +215,9 @@ GT9xx 驱动，不适用于当前 6.1 DTS 实际绑定的 mainline Goodix 驱动
 `vcc4v0_sys`、三个中间轨、四个 PCIe AVDD 轨和 `power_on_led`，并把
 `vcc28_dvp` 改为由 `vcc4v0_sys` 供电。
 
-同时回移 HUSB311 GPIO0_B7、OTG PHY VBUS、Wi-Fi host-wake、24C04 EEPROM
-和 STK8BA50。
+同时回移 HUSB311 GPIO0_B7、Wi-Fi host-wake、24C04 EEPROM 和 STK8BA50。
+7.3 的 Type-C VBUS 改由 HUSB311 的 TCPM 控制，USB2 PHY 不再占用同一
+regulator。Sink 与 Source 都只声明固定 5V/3A PDO，运行功耗按 15W 计算。
 
 实机确认 MIPI 摄像头接口位于核心板而不是载板，默认产品摄像头是 USB UVC。因此：
 
@@ -224,5 +225,6 @@ GT9xx 驱动，不适用于当前 6.1 DTS 实际绑定的 mainline Goodix 驱动
 - 当前 6.1 Linux/Android 恢复 IMX577、CSI0 图和 `mipi_cam_pwen`；
 - 7.3 保留 `mipi_cam_pwen`；主线尚无 IMX577 驱动，暂不启用传感器节点。
 
-24C04 在原厂 DTB 中没有 label、nvmem cell、MAC 或 EDID 引用，内容用途
-仍需上机读取确认。先只读导出，不做写入。
+24C04 的总线、地址、compatible 和页大小均与原厂 DTB 一致，未发现配置
+错误。当前机器的 `0x56` 不 ACK，因此暂不将 EEPROM 视为可用外设，也不
+安排写入。

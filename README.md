@@ -62,7 +62,7 @@ SHA256: D516E8F62CE040E76CAB2CBC394DBE46AB53F3F82E9CEC1ED8E5714F51358521
 | 外部显示 | HDMI1、DP0（USB-C DP Alt Mode）；DP0 最终基线尚未稳定闭环 |
 | 有线网络 | GMAC0，RGMII，PHY 地址 1 |
 | PCIe | PCIe 2.0 x1 lane 1 与 lane 2，两路均启用 |
-| USB | USB3 OTG0、USB3 Host1、两路 USB2 Host、HUSB311 Type-C PD |
+| USB | USB3 OTG0、USB3 Host1、两路 USB2 Host、HUSB311 Type-C 双角色电源/数据，Sink/Source 均为固定 5V/3A |
 | 音频 | ES8388 + I2S1（扬声器/耳机/Audio 耳麦/LINE IN）；内置麦克风走 PDM0；另有 HDMI1/DP0 音频 |
 | RTC | HYM8563，I2C4 `0x51`，GPIO0_B0 中断 |
 | 触摸 | Goodix GT9110，I2C4 `0x14` |
@@ -74,8 +74,8 @@ SHA256: D516E8F62CE040E76CAB2CBC394DBE46AB53F3F82E9CEC1ED8E5714F51358521
 
 ## Mainline 7.3 当前实测状态
 
-截至 `2026-11-16T23:52:00+08:00`，运行现场为
-`7.3.4-edge-rockchip64`，U-Boot
+截至 `2026-11-17T22:00:00+08:00`，运行现场为
+`7.3.5-edge-rockchip64`，U-Boot
 `2026.07-Sece3-P743c-Hae08-V6f98-Bd800-R448a`，根文件系统为
 `/dev/mmcblk1p1`（TF 卡，UUID `7faf7863-d5d5-419e-81bd-902914de6883`）。
 
@@ -87,7 +87,8 @@ SHA256: D516E8F62CE040E76CAB2CBC394DBE46AB53F3F82E9CEC1ED8E5714F51358521
 | USB-C DP | **未闭环**。当前 `DP-1 disconnected`，Type-C partner 不存在；历史版本抓到过 4K30，当前基线不能复现稳定连接 |
 | GT9110 触控 | ✅ **已工作**。`ID 9110`；随 270° 面板方向使用 `inverted-x + swapped-x-y`，九点映射验证通过 |
 | HYM8563 RTC | ✅ **已工作**。`registered as rtc0` |
-| I2C4 控制器 | `0x14` / `0x2d` / `0x51` 三点均为 `UU`，全部正常绑定 |
+| I2C4 控制器 | `0x14` / `0x2d` / `0x51` 均正常绑定；`0x56` EEPROM 不 ACK |
+| STK8BA50 加速度计 | ✅ **已工作**。I2C6 `0x18` 绑定，GPIO4_B7 中断正常；内建驱动通过 mount matrix 校准，并由 `really-auto-rotate.service` 自动旋转 LVDS |
 | AP6275P Wi-Fi | ✅ **已工作**。固件 BCM43752/2 `18.35.387.23.146` 启动，`wlP4p65s0` 已连接 `HUAWEI-7409_5G` |
 | AP6275P Bluetooth | ✅ **已工作**。`hci0` 识别为 `BCM43752A2`，控制器已上电 |
 | TF 卡启动 | ✅ **已闭环**。已冷启动并从 `/dev/mmcblk1p1` 挂载根文件系统 |
@@ -179,7 +180,8 @@ TL/TC/TR、ML/C/MR、BL/BC/BR 全部落在对应目标。
 I2C0: RK8602 0x42 (CPU Big0), RK8603 0x43 (CPU Big1)
 I2C1: RK8602 0x42 (NPU)
 I2C3: ES8388 0x11
-I2C4: IMX577 0x1a (core board), GT9110 0x14, LT9211 0x2d, HYM8563 0x51, 24C04 0x56
+I2C4: IMX577 0x1a (core board), GT9110 0x14, LT9211 0x2d, HYM8563 0x51,
+      24C04 0x56 (DTS 与原厂一致，当前硬件不 ACK)
 I2C6: LT6911UXC2 0x2b, STK8BAxx 0x18, HUSB311 0x4e
 ```
 
@@ -232,7 +234,7 @@ SATA0 / PCIe3 --> disabled
 
 | 功能 | 引脚 | 有效电平 | 设备树用途 |
 | --- | --- | --- | --- |
-| Type-C PD 中断 | GPIO0_D7 | Low | HUSB311 interrupt |
+| Type-C PD 中断 | GPIO0_B7 | Low | HUSB311 interrupt |
 | RTC 中断 | GPIO0_B0 | Low | HYM8563 interrupt |
 | 外部看门狗 | GPIO0_D3 | High | SGM760B GPIO watchdog，显式禁用 |
 | 触摸 reset | GPIO1_D3 | Low | GT9110 `reset-gpios` |
@@ -250,7 +252,7 @@ SATA0 / PCIe3 --> disabled
 | PCIe lane 2 reset | GPIO3_B7 | High | AP6275P `pcie2x1l2` |
 | PCIe lane 1 reset | GPIO1_A7 | High | `pcie2x1l1` |
 | SD 卡电源 | GPIO4_C3 | High | `vcc_sd` |
-| Type-C VBUS enable | GPIO1_D1 | High | HUSB311 VBUS control |
+| Type-C VBUS enable | GPIO1_D1 | High | HUSB311 source-role VBUS control |
 | USB-A host 5 V enable | GPIO3_A5 | High | `vcc5v0_host` |
 | eDP 背光 enable | GPIO4_B6 | High | PWM6 backlight enable |
 | 扬声器功放 enable | GPIO4_B2 | Low | ES8388 speaker amplifier |
@@ -325,7 +327,8 @@ VP2、PWM6 背光和 AUX panel 描述，但默认全部 disabled；启用实际 
 - eMMC HS400、SD UHS SDR104；
 - GMAC0/RGMII、PHY@1、`tx_delay = 0x44` 和 GPIO2_C4 PHY reset；
 - PCIe 2.0 lane 1/lane 2、对应的 combphy 资源、reset 与 3.3 V 供电；
-- USB2/DP/USB3 PHY、DWC3、HUSB311 Type-C 角色切换；
+- USB2/DP/USB3 PHY、DWC3、HUSB311 Type-C 双角色切换；VBUS 仅由 TCPM 控制，
+  不再由 USB2 PHY 无条件拉起；
 - VOP2 到 HDMI1、DP0、eDP0、DSI1 的四条显示通路；
 - `hdmi_receiver` 内置 HDMI RX、160 MiB CMA、GPIO4_C6 HPD 和 HDMI RX pinmux；
 - LT6911UXC2、27 MHz 外部时钟、GPIO3_A7 reset、GPIO2_C3 HPD、GPIO1_C7 中断，以及 `csi_dphy0 → csi2 → vicap` graph；
@@ -333,6 +336,7 @@ VP2、PWM6 背光和 AUX panel 描述，但默认全部 disabled；启用实际 
 - `rga3_core0/1`、双核 RGA2、VPU121、`vepu121_0..3` JPEG 编码、`vdec0/1` 和 AV1 解码；
 - VDENC/RKVDEC 电源域与 `vdd_vdenc_s0` 的 mainline 供电绑定；
 - LT9211 DSI→LVDS、GT9110 触摸、HYM8563 RTC、ES8388 声卡；
+- STK8BA50 加速度计，驱动内建；
 - LT9211 双通道 odd/even LVDS、原厂 DSI `BURST + LPM` flags 和板级可配置
   `lontium,dsi-mode-flags`；
 - AP6275P 使用 HYM8563 的真实 32.768 kHz CLKOUT；RTC 晚绑定后才重新
