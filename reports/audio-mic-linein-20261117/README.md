@@ -11,7 +11,12 @@
 - 当前运行设备：`root@192.168.3.233`
 - 当前启动介质：TF 卡 `/dev/mmcblk1p1`
 - 当前根文件系统 UUID：`7faf7863-d5d5-419e-81bd-902914de6883`
-- 当前内核：`7.3.4-edge-rockchip64`
+- 最新 DP 运行内核：`7.3.5-edge-rockchip64 #82`；本报告最近一次音频回归
+  使用 `#76`，后续仍需在最终镜像中重新验收
+- 最近实机回归：2026-11-21，冷启动后 PDM 能出现非零采样，但持续采集仍会
+  在约 0.8 秒后停顿；已试过厂家驱动的 clock/filter delay，未闭环，补丁已撤回。
+  扬声器静音 PCM 链路验证进入 `DAPM On`，模拟输出档位与默认 sink 已修正并
+  固化到构建树
 
 ## 0. 接手规则：必须记录并回填进展
 
@@ -82,11 +87,11 @@
 
 | 项目 | 状态 | 说明 |
 | --- | --- | --- |
-| ES8388 播放 | ⚠️ 基线可用，仍需完整回归 | I2S1 M0、MCLK 12.288 MHz、扬声器/耳机功放和 DAPM 已枚举 |
+| ES8388 播放 | ✅ 硬件链路通过，待听感确认 | 冷启动后默认 sink 为 ES8388；`Output 1/2 = 27 (-3 dB)`、`PCM = 189`；静音 PCM 下 `Speaker`、功放 `VCC/DRV`、`LOUT2/ROUT2` 全部为 `On` |
 | ES8388 耳机检测 | ⚠️ 待完善 | GPIO4_B3 检测、GPIO4_B4 耳机功放使能；需验证插拔自动切换 |
 | ES8388 Audio 耳麦输入 | ❌ 未闭环 | 原厂走 Line 1；mainline 当前所有已试路由均为数字零 |
 | 独立 LINE IN | ❌ 未闭环 | 原厂走 Line 2，并由 GPIO1_B6 handler 动态切换 |
-| 内置 PDM 麦克风 | ✅ **已实机验证** | 重启后自动出现 `Really-PDM-Mics`；300 MHz 时钟开启，语音采样非零 |
+| 内置 PDM 麦克风 | ⚠️ **仅短时通过，持续采集失败** | 冷启动后 48 kHz 曾得到 `nonzero=2798`、`RMS=1865`、`peak=32317`；加入厂家同款约 20 ms clock/filter 等待后仅从约 0.55 秒延长到约 0.81 秒，仍会停顿；直接 `hw:0,0` 返回 `Input/output error`。驱动时序不是唯一根因 |
 | 扬声器音质/爆音/低频 | ⚠️ 待完善 | 历史上有低频 hum、偏置和增益配置问题，不能按“能响”即关闭 |
 
 ---
@@ -445,6 +450,24 @@ PDM clocks/DMA/pins
 完整内核构建在本报告生成时仍在进行。后续助手必须先确认该构建最终成功，
 安装匹配的 Armbian kernel package，而不是只替换裸 kernel 或裸 DTB。
 
+### 5.2.1 用户态扬声器和默认路由
+
+2026-11-21 的实机回归确认，ES8388 驱动默认把 `Output 1/2` 重置为 `0`
+（`-30 dB`），同时 HDMI 卡可能抢到默认 sink。两者叠加会让 GNOME
+“扬声器测试”既送到错误设备，又把模拟输出保持在最低档。
+
+构建仓已加入：
+
+```text
+/home/user/github/build/userpatches/overlay/really-audio/usr/local/sbin/really-audio-route
+/home/user/github/build/userpatches/overlay/really-audio/etc/systemd/system/really-audio-route.service
+```
+
+服务在 `sound.target` 后把扬声器开关打开、`Output 1/2` 设为 `27`、
+`PCM` 设为 `189`。WirePlumber 规则同时设置 ES8388 的
+`priority.driver` 和 `priority.session` 为 `2000`，避免 HDMI PCM 成为默认
+sink。
+
 ### 5.3 mainline 驱动差异和风险
 
 当前 Linux 7.3 mainline `rockchip_pdm.c` 的 compatible 表没有
@@ -723,15 +746,20 @@ amixer -c Really-ES8388 contents
 - [x] `Really-PDM-Mics` 声卡出现。
 - [x] RK3588 PDM driver bind 成功。
 - [x] PDM 时钟、pinmux、DMA 状态取证。
-- [x] 从 PDM 静默采集到非零语音。
+- [!] 从 PDM 静默采集到非零语音；短时有数据，但持续采集会停顿。
 - [x] 验证 PDM 当前为单路麦克风复制到左右双声道。
-- [x] 确认重启后 PDM 自动工作。
+- [!] 确认重启后 PDM 自动工作；冷启动只恢复短时数据，尚不可连续录音。
 - [ ] 确认 ES8388 Audio 耳麦使用 Line 1。
 - [ ] 确认独立 LINE IN 使用 Line 2。
 - [ ] 确认 GPIO1_B6 插拔状态和极性。
 - [ ] 实现 Audio/LINE IN 动态路由。
 - [ ] 验证耳机插入后扬声器关闭、耳机输出启用。
 - [ ] 回归扬声器低频 hum、pop/click 和偏置时序。
+- [ ] 用户实际听一次低音量扬声器测试，确认可闻响度。
+- [ ] 用下一次完整 Armbian 镜像回归 `really-audio-route.service` 和默认 sink。
+- [x] 验证厂家驱动的 DMIC 上电等待和滤波器初始化时序；不足以闭环，补丁已撤回。
+- [ ] 对比原厂 Android 运行中的 PDM 寄存器/供电，确认 DMIC 数据 lane 与板级
+  电源；要求至少 60 秒连续 48 kHz 采集。
 - [ ] 将最终有效改动同步到构建仓和硬件仓。
 - [ ] 重新构建完整 Armbian 镜像并记录 SHA256。
 - [ ] 更新本报告 §1、§5、§7、§10、§11、§12。
@@ -773,6 +801,12 @@ amixer -c Really-ES8388 contents
 | 2026-11-17T00:30:54+08:00 | Codex / user | 发现构建仓已有 PDM DTS，但硬件 Git 仓尚未同步 | 已将 `pdm-codec`、`pdm-mics`、PDM0 节点补入 `dts-7.3-linux/rk3588-really.dts`；两份文件 `cmp=0` | 源码现已同步，PDM 仍未实机验证 | 完成内核包安装后静默采集 PDM |
 | 2026-11-17T00:43:00+08:00 | Codex / user | 安装内核+DTB、重启并静默测试内置 PDM 麦克风 | 内核 `7.3.4-edge-rockchip64 #72`；DTB `33c3fa37...044dcf7`；card1 `Really-PDM-Mics`；驱动 bind `fe4b0000.pdm`；录音 peak=32317、RMS≈887、nonzero=1399；左右声道完全相同 | **PDM 内置麦克风可以收音**；当前为单路复制双声道；`pw-record --sample-count` 收尾会挂住，需要 `timeout`/外部终止 | 做长时稳定性与 PDM 通道映射回归 |
 | 2026-11-17T00:46:31+08:00 | Codex / user | 复盘“先全零、后有声”差异 | `--target 34` 使用了 object.id，并非 `pw-record` 要求的 node serial/name，实际落到默认 ES8388；改用 `alsa_input.platform-pdm-mics.stereo-fallback` 后 PDM 时钟 RUNNING 且采样非零 | 修复点在录音命令的 source 选择，不在内核或硬件 | 后续录音统一使用 PDM node.name |
+| 2026-11-21T10:35:00+08:00 | Codex / user | 复核扬声器测试、录音和默认设备 | 初始默认 sink 为 HDMI；ES8388 `Output 1/2=0 (-30 dB)`；PDM 在异常热状态采样全零 | 默认 sink 和模拟输出档位均为确定性问题；热解绑/重绑后的 PDM 状态不可验收 | 冷启动复测 PDM，并固化输出默认值 |
+| 2026-11-21T10:40:00+08:00 | Codex / user | 冷启动 Really 并按 PipeWire `node.name` 重测 PDM | 内核 `7.3.5-edge-rockchip64 #76`；DTB `08068e501bf38fb1ffc87f480d4ef6865645955a232b4e43e92ea8a4397cf562`；PDM `nonzero=2798`、`RMS=1864.99`、`peak=32317` | **冷启动后 PDM 收音正常**；此前全零来自运行态音频图/热重绑异常 | 固化扬声器默认值并做实际听感确认 |
+| 2026-11-21T10:43:00+08:00 | Codex / user | 设置 ES8388 安全输出档位并播放全静音 PCM | `Output 1/2=27`、`PCM=189`；`Speaker`、功放 `VCC/DRV`、`LOUT2/ROUT2` 全部为 `On`；功放 enable GPIO 为有效低电平；播放无报错 | **扬声器硬件 DAPM/GPIO 链路通过** | 用户以低音量系统测试音确认可闻输出 |
+| 2026-11-21T10:45:00+08:00 | Codex / user | 将音频默认值写入 Armbian 构建树 | 新增 `really-audio-route.service` 和脚本；WirePlumber 同时提升 `priority.driver/session` | 源码改动完成，待下一次完整镜像验收 | 构建并检查镜像内服务、默认 sink 与冷启动录音 |
+| 2026-11-21T10:48:00+08:00 | Codex / user | 做 PDM 持续采集回归 | 8 秒 `pw-record` 仅写 26624 帧（约 0.55 秒）后 `hw_ptr` 停住，ALSA 状态仍为 `RUNNING`；直接 `arecord hw:0,0` 返回 `pcm_read: Input/output error`；8/16/48 kHz 均只得到约 0.25 秒数据 | PDM 尚未闭环；厂家驱动在 clock enable 后等待约 20 ms，并在 RX 启动后等待约 20 ms filter，mainline 当前均无该时序 | 增加最小 PDM 时序补丁并做长时采集 |
+| 2026-11-21T11:10:00+08:00 | Codex / user | 编译并实机验证 PDM clock/filter delay 补丁 | 运行中 `mclk_pdm0=300 MHz`、PDM `CTRL0/CTRL1/CLK_CTRL` 持续有效；12 秒 `pw-record` 写入 38912 帧（约 0.81 秒），`nonzero=923`、`RMS=740`、`peak=32316`，之后 `hw_ptr` 停住；裸 `hw:0,0` 仍报 I/O error | **延迟补丁不足，不能保留**；当前证据更指向 PDM 数据/DMA 通路或板级 DMIC 供电，而非单纯启动等待 | 撤回补丁；后续对比原厂 Android 运行态、PDM 供电和 DMA 请求 |
 |  |  |  |  |  |  |
 
 建议每次追加记录以下固定字段：
