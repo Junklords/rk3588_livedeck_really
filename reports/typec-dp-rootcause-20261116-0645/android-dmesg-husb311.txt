@@ -1,0 +1,15 @@
+[    4.787150] [    T1] husb311_check_revision: i2c read retry 0 sueccess
+[    5.973599] [    T9] husb311_check_revision: i2c read retry 0 sueccess
+[    6.453497] [    T9] husb311_check_revision: i2c read retry 0 sueccess
+[    6.461502] [    T9] husb311_check_revision: i2c read retry 0 sueccess
+[    6.463872] [    T9] husb311_check_revision: i2c read retry 0 sueccess
+[    6.466774] [    T9] husb311_check_revision: i2c read retry 0 sueccess
+[    6.647962] [    T9] husb311_check_revision: i2c read retry 0 sueccess
+[    6.694522] [    T9] husb311_check_revision: i2c read retry 0 sueccess
+[    6.701000] [    T9] husb311_check_revision: i2c read retry 0 sueccess
+[    6.703941] [    T9] husb311_check_revision: i2c read retry 0 sueccess
+[    6.905712] [    T9] husb311_check_revision: i2c read retry 0 sueccess
+[    6.965999] [    T9] husb311_check_revision: i2c read retry 0 sueccess
+[    7.771006] [    T9] husb311_check_revision: i2c read retry 0 sueccess
+[    7.774484] [    T9] husb311_check_revision: i2c read retry 0 sueccess
+[   15.755630] [    T9] husb311_check_revision: i2c read retry 0 sueccess

@@ -16,6 +16,10 @@ vendor 6.1 的现有修复、7.3 回移项与明确不适用项见
 2026-11-15 的 mainline 实机未闭环问题、现场日志和已排除项见
 [`reports/mainline-open-issues-20261115-2130/README.md`](reports/mainline-open-issues-20261115-2130/README.md)。
 
+2026-11-16 的 Type-C DP 真机根因分析(中断 `nobody cared` → tcpm 失明,
+含工厂 DTB 对照与修复路线)见
+[`reports/typec-dp-rootcause-20261116-0645/README.md`](reports/typec-dp-rootcause-20261116-0645/README.md)。
+
 ## 版本目录
 
 | 目录 | 目标系统 | 主要差异 |

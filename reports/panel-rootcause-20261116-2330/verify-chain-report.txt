@@ -1,0 +1,30 @@
+[PASS] 0.1 镜像文件存在且非空: size=6505365504 bytes
+[PASS] 0.2 镜像 SHA256: e54aa4c0cd009242fb45258e0a92c64d88c8fd8b94ecbd9108cb9cc4fd193edd
+[PASS] 1.1 GPT 主头/条目 CRC + rootfs@LBA32768: headerCRC=OK entriesCRC=OK sgdisk=No problems 分区=['rootfs@LBA32768']
+[PASS] 1.2 备份 GPT 存在: 备份GPT签名=b'EFI PART'
+[PASS] 1.3 BootROM 协议: LBA64 = RKNS idblock: sector64 magic=RKNS ✓ (BootROM 加载入口)
+[WARN] 1.4 idbloader(TPL+SPL) 与原镜像逐字节对照: SPL/TPL 差异字节 59655/524288 (11%), 差异区段 365 个, 最大 0x290bd-0x2d56b (17582B); 邻近字符串=[] ← 重编译产物(同源码同defconfig, 构建时间/框架版本不同); 功能等效性由 2.1/3.2/3.4/3.5 兜底
+[PASS] 2.1 DDR init blob = v1.20_20250926 (原镜像运行时 fwver 实证同版): rkbin DDR v1.20 blob 完整内嵌 @idbloader+0x800 (len=76480)
+[PASS] 3.1 u-boot.itb FIT magic @8MB (SPL 固定加载点): FIT magic d00dfeed @sector64+0x7f8000
+[PASS] 3.2 FIT 组件哈希 vs 原镜像 (atf-1/2/3, fdt-1, u-boot): atf-1=7612223b82b9… 一致✓; atf-2=b2af21b50499… 一致✓; atf-3=70505bb764db… 一致✓; fdt-1=a98f1dace42d… 一致✓; u-boot=构建产物(差异由3.5评估)
+[PASS] 3.3 u-boot proper: AArch64 + 入口 0x00800000 (SRAM 约定): u-boot proper: arch=AArch64 entry=0x800000 size=814008B
+[PASS] 3.4 u-boot 二进制关键字符串 (reallylog 命令/distro 扫描): U-Boot 2026.07✓, reallylog✓, boot.scr✓, boot_targets✓  ← reallylog 是 boot.cmd 打点依赖
+[WARN] 3.5 u-boot 功能字符串集合对照 (评估二进制漂移的功能影响): 新独有(去元数据)=2 旧独有(去元数据)=1 新增样例=['Failed to set SCMI cpu clk %lu: %d', '2026.07_armbian-2026.07-Sece3-P29ec-H80e0-V9f08-Bb936-R448a'] 缺失样例=['2026.07_armbian-2026.07-Sece3-Pc12d-Hae08-V6f98-Bd800-R448a'] (原始独有: 新3/旧2, 绝大多数为时间戳/版本戳)
+[PASS] 4.0 两个镜像 rootfs 只读挂载: new=挂载✓ old=挂载✓
+[PASS] 4.1 rootdev UUID ↔ ext4 superblock UUID (错则 initramfs 卡死): armbianEnv rootdev=UUID=b6ea9ab2-369b-46db-a2c8-e211e8c13767 ↔ ext4 UUID=b6ea9ab2-369b-46db-a2c8-e211e8c13767
+[PASS] 4.2 /boot 启动文件齐全 (boot.cmd 逐一 load 的目标): 缺=无; Image->vmlinuz-7.3.4-edge-rockchip64; uInitrd=30321546B
+[PASS] 4.3 boot.cmd / boot.scr 载荷 / armbianEnv 与原镜像对照: boot.cmd 逐字节一致✓; boot.scr 载荷(一致✓; 头部时间戳差异属预期); armbianEnv 非rootdev行(排序+去空白) 语义一致✓
+[PASS] 4.4 boot.scr 合法 U-Boot script 镜像: uImage头=27051956 (合法)
+[PASS] 4.5 内核 Image: arm64 magic + 版本 banner: arm64 Image magic=✓; banner='7.3.4-edge-rockchip64'
+[PASS] 4.6 uInitrd 合法: uInitrd uImage magic=✓ size=30321546B
+[PASS] 4.7 armbianEnv 引用自洽 (fdtfile 存在 + reallylog/rotate/cma): fdtfile=rockchip/rk3588-really.dtb 存在=✓; 关键参数 3/3: ['reallylog_enabled=yes', 'fbcon=rotate:3', 'cma=512M']
+[PASS] 5.1 DTB 关键节点 (reboot-mode/i2c4/lt9211/触摸/RTC/dsi1/pwm12/emmc/uart2): /syscon@fd588000/reboot-mode/mode-sd=1380107026✓; /i2c@feac0000/status=okay✓; /i2c@feac0000/bridge@2d/compatible=lontium,lt9211✓; /i2c@feac0000/touchscreen@14/status=okay✓; /i2c@feac0000/rtc@51/compatible=haoyu,hym8563✓; /dsi@fde30000/status=okay✓; /pwm@febf0000/status=okay✓; /mmc@fe2e0000/status=okay✓; /serial@feb50000/status=okay✓
+[PASS] 5.2 DTB 节点集合/compatible/status 与原镜像语义比对: 节点: 新增=[] 删除=[] compat/status变化=[] —— 节点集合与已验证镜像完全一致
+[PASS] 5.3 触摸坐标尺寸 = 竖屏基线(唯一已记录惰性差异): x=1080 y=1920 (repo HEAD 取 Android 基线竖屏 1080x1920; 镜像旧值 1920x1080; 该属性在触摸 ENXIO 修复前为惰性, 属唯一已记录值差异)
+[PASS] 6.1 armbian-image-release 元数据: ['BOARD=really', 'LINUXFAMILY=rockchip64', "EXTENSIONS='really-firstrun'"]
+[PASS] 6.2 内核模块目录与 Image 版本匹配: /mnt/vnew/lib/modules/7.3.4-edge-rockchip64: 15 项
+[PASS] 6.3 GDM3 + 自动登录 user: gdm3=True autologin=True
+[PASS] 6.4 really 服务开机启用: multi-user.wants 命中 ['really-phy-leds.service', 'really-rtc-late-bind.service', 'really-touch-late-bind.service']
+[PASS] 6.5 预设账户 root/user(1000): root:0 + user:1000 ✓
+
+PASS=26 WARN=2 FAIL=0

@@ -1,0 +1,38 @@
+gpiochip0: 32 GPIOs, parent: platform/fd8a0000.gpio, gpio0:
+ gpio-0   (                    |interrupt           ) in  lo IRQ 
+ gpio-7   (                    |interrupt           ) in  hi IRQ 
+ gpio-8   (                    |interrupt           ) in  hi IRQ 
+ gpio-16  (                    |vcc1v8_sys_en       ) out hi 
+ gpio-20  (                    |regulator-wifi-vbat ) out hi 
+ gpio-21  (                    |device-wakeup       ) out lo 
+ gpio-22  (                    |shutdown            ) out hi 
+ gpio-31  (                    |interrupt           ) in  lo IRQ 
+
+gpiochip1: 32 GPIOs, parent: platform/fec20000.gpio, gpio1:
+ gpio-7   (                    |reset               ) out hi 
+ gpio-10  (                    |sbu2-dc             ) out lo 
+ gpio-25  (                    |regulator-vbus5v0-ty) out lo 
+ gpio-27  (                    |sysfs               ) out hi 
+
+gpiochip2: 32 GPIOs, parent: platform/fec30000.gpio, gpio2:
+ gpio-20  (                    |PHY reset           ) out hi ACTIVE LOW
+ gpio-21  (                    |regulator-vcc-5g-mod) out hi 
+
+gpiochip3: 32 GPIOs, parent: platform/fec40000.gpio, gpio3:
+ gpio-0   (                    |sbu1-dc             ) out lo 
+ gpio-5   (                    |regulator-vcc5v0-hos) out hi 
+ gpio-6   (                    |reset               ) out hi 
+ gpio-11  (                    |regulator-vcc3v3-pci) out hi 
+ gpio-12  (                    |enable              ) out lo ACTIVE LOW
+ gpio-14  (                    |regulator-lvds-pwr-e) out hi 
+ gpio-15  (                    |reset               ) out hi 
+ gpio-21  (                    |frl-enable          ) out hi ACTIVE LOW
+ gpio-29  (                    |regulator-vcc-5g-dpr) out lo 
+
+gpiochip4: 32 GPIOs, parent: platform/fec50000.gpio, gpio4:
+ gpio-6   (                    |regulator-vcc5v0-usb) out hi 
+ gpio-8   (                    |sysfs               ) in  hi 
+ gpio-10  (                    |enable              ) out hi ACTIVE LOW
+ gpio-11  (                    |Headphone detection ) in  lo IRQ 
+ gpio-12  (                    |enable              ) out lo 
+ gpio-19  (                    |regulator-vcc-sd    ) out lo 
