@@ -4,7 +4,7 @@ Author: Codex (GPT-5); executor: user
 
 Generated: 2026-11-14T21:50:00+08:00
 
-Last updated: 2026-11-17T23:55:00+08:00
+Last updated: 2026-11-21T12:00:00+08:00
 
 Context: Board-level hardware enablement and validation on the Really
 TVI2340R, starting from the reconstructed vendor DTB and the mainline
@@ -77,13 +77,29 @@ quality remain open. See `../reports/audio-mic-linein-20261117/README.md`.
 - HUSB311 owns VBUS through `vbus-supply`. `u2phy0_otg` must not bind the
   same regulator as `phy-supply`.
 - USB-A host power is controlled from GPIO3_A5.
-- DP uses two Type-C lanes while USB3 uses the other two lanes.
+- The production DP baseline uses two Type-C lanes while USB3 uses the
+  other two lanes.
 
-Validated result: Type-C USB2 hub and USB-A keyboard enumerate. Type-C DP
-reached 3840x2160@30 in an earlier test configuration, but this is not a
-closed result for the current baseline. Current runs repeatedly leave
-`DP-1` disconnected and cycle the HUSB311 partner through
-`SRC_READY -> disconnected -> TOGGLING`.
+Validated result on 2026-11-21:
+
+- DP0 is routed through VOP2 VP0; HDMI1 uses VP1.
+- The DP link is capped at two-lane HBR2 (`540000`) and RGB444 8bpc.
+- HBR3 completed clock recovery and channel equalization, but its video
+  stream remained unusable. HBR2 restored scanout.
+- 1080p60 and 3840x2160@30 produced an image through both a direct
+  one-cable monitor and `Type-C -> dock -> HDMI`.
+- `VIDEO_FIFO_OVERFLOW_STREAM0` remains clear during sustained 4K30.
+
+The opt-in kernel properties are implemented by:
+
+```text
+0016-really-prefer-8bpc-dp-and-keep-husb-irq.patch
+0018-drm-bridge-dw-dp-allow-board-link-rate-cap.patch
+```
+
+Two-lane HBR2 does not have enough payload bandwidth for full RGB444
+4K60. Four-lane HBR2 and YCbCr subsampling remain explicit follow-up
+experiments rather than production claims.
 
 ### PCIe, Wi-Fi and Bluetooth
 
@@ -134,8 +150,8 @@ release suffix.
 
 ### Display
 
-- VOP2 VP0 -> HDMI1.
-- VOP2 VP1 -> DP0 -> USB-C DP Alt Mode.
+- VOP2 VP0 -> DP0 -> USB-C DP Alt Mode.
+- VOP2 VP1 -> HDMI1.
 - VOP2 VP3 -> four-lane DSI1 -> LT9211 -> dual-link 24-bit VESA LVDS.
 - LT9211 port 2 carries odd pixels and port 3 carries even pixels. The
   panel sink exposes the matching `dual-lvds-odd-pixels` and
@@ -171,10 +187,9 @@ release suffix.
   channel-enable mask through
   `0015-lt9211-enable-dual-link-lvds-channels.patch`.
 
-Validated result: HDMI output works. Type-C DP previously reached 4K30, but
-the current final baseline does not maintain a Type-C partner/Alt Mode
-connection. DP must be documented as open until a repeated cold-boot and
-hot-plug regression passes.
+Validated result: HDMI output works. Type-C DP now produces an image at
+1080p60 and 4K30 with two-lane HBR2 and RGB444 8bpc. HBR3 training alone
+was insufficient because the sink could not decode the video stream.
 
 ### Optional internal eDP panel
 
@@ -305,9 +320,10 @@ click. The click is more likely ES8388/amplifier power-on or mute timing.
 4. HDMI output can remain logically connected after cable removal, causing
    EDID I2C retries and a compositor stall. The image currently starts HDMI
    disabled by default.
-5. Type-C DP is open, not merely limited to 4K30. Current `DP-1` is
-   disconnected and the HUSB311 Type-C partner repeatedly detaches. Previous
-   two-lane 4K30 success must not be used as a final validation claim.
+5. Type-C DP is closed for 4K30. The prior HBR3 path trained yet produced a
+   black image, so the production DTS caps the link at HBR2 and keeps RGB444
+   8bpc. Full RGB 4K60 needs four-lane HBR2, a functioning HBR3 video path,
+   or chroma subsampling, and remains open.
 6. TF boot is closed. A cold boot through the community SPL/U-Boot chain
    mounted ext4 UUID `7faf7863-d5d5-419e-81bd-902914de6883` from
    `/dev/mmcblk1p1`.

@@ -15,6 +15,12 @@ Android 与原厂 5.10 的显示方向匹配机制、Linux 7.3 横屏闪现原�
 优化顺序见
 [`reports/display-orientation-android-vs-linux-20261117/README.md`](reports/display-orientation-android-vs-linux-20261117/README.md)。
 
+锁屏触摸唤醒、恢复后方向校正和首次启动 GDM/控制台竞争的分析与修复见
+[`reports/really-lock-orientation-firstboot-20261118/README.md`](reports/really-lock-orientation-firstboot-20261118/README.md)。
+
+USB-C DP 黑屏的定位、候选路径和最终 HBR2 基线见
+[`reports/really-usbc-dp-black-20261121/README.md`](reports/really-usbc-dp-black-20261121/README.md)。
+
 当前完整状态、触控 Android 基线和群友 AI 接手顺序见
 [`docs/AI-HANDOVER-CHECKLIST-20261115.md`](docs/AI-HANDOVER-CHECKLIST-20261115.md)。
 
@@ -63,7 +69,7 @@ SHA256: D516E8F62CE040E76CAB2CBC394DBE46AB53F3F82E9CEC1ED8E5714F51358521
 | SD 卡 | 4 bit SDMMC，UHS SDR104，独立 3.3 V 供电控制 |
 | 内屏 | 15.6 吋竖屏；DSI1 4-lane → LT9211 → 双通道 odd/even 24 bit VESA LVDS。控制器扫描 1920×1080@60，DT 提供 270° 方向，桌面和 fbcon 均呈 1080×1920 竖屏 |
 | 备用内屏 | eDP0 是板级物理接口和可选内屏装配路径；同一 DTS 保留 VP2/eDP0/AUX panel 拓扑，但默认将控制器与整条 route 标为 disabled |
-| 外部显示 | HDMI1、DP0（USB-C DP Alt Mode）；DP0 最终基线尚未稳定闭环 |
+| 外部显示 | HDMI1；DP0（USB-C DP Alt Mode）采用 two-lane HBR2 + 8bpc，直连和扩展坞链路均已验证 4K30 |
 | 有线网络 | GMAC0，RGMII，PHY 地址 1 |
 | PCIe | PCIe 2.0 x1 lane 1 与 lane 2，两路均启用 |
 | USB | USB3 OTG0、USB3 Host1、两路 USB2 Host、HUSB311 Type-C 双角色电源/数据，Sink/Source 均为固定 5V/3A |
@@ -88,15 +94,15 @@ SHA256: D516E8F62CE040E76CAB2CBC394DBE46AB53F3F82E9CEC1ED8E5714F51358521
 | --- | --- |
 | LVDS 内屏 | `LVDS-1 connected`，双链路画面正常 |
 | HDMI OUT | 当前未接显示器，`HDMI-A-1 disconnected` |
-| USB-C DP | **未闭环**。当前 `DP-1 disconnected`，Type-C partner 不存在；历史版本抓到过 4K30，当前基线不能复现稳定连接 |
+| USB-C DP | ✅ **基线可用**。DP0→VP0，两 lane HBR2（5.4 Gbps/lane），RGB444 8bpc；1080p60、4K30、直连一线通和 Type-C 扩展坞均已出图 |
 | GT9110 触控 | ✅ **已工作**。`ID 9110`；随 270° 面板方向使用 `inverted-x + swapped-x-y`，九点映射验证通过 |
 | HYM8563 RTC | ✅ **已工作**。`registered as rtc0` |
 | I2C4 控制器 | `0x14` / `0x2d` / `0x51` 均正常绑定；`0x56` EEPROM 不 ACK |
 | STK8BA50 加速度计 | ✅ **已工作**。I2C6 `0x18` 绑定，GPIO4_B7 中断正常；内建驱动通过 mount matrix 校准，并由 `really-auto-rotate.service` 自动旋转 LVDS |
 | AP6275P Wi-Fi | ✅ **已工作**。固件 BCM43752/2 `18.35.387.23.146` 启动，`wlP4p65s0` 已连接 `HUAWEI-7409_5G` |
 | AP6275P Bluetooth | ✅ **已工作**。`hci0` 识别为 `BCM43752A2`，控制器已上电 |
-| TF 卡启动 | ✅ **已闭环**。已冷启动并从 `/dev/mmcblk1p1` 挂载根文件系统 |
-| 音频 | ⚠️ **部分闭环**。ES8388 播放基线可用；PDM 内置麦克风已实机收音；Audio 耳麦、LINE IN、耳机自动切换和扬声器音质仍待完善 |
+| TF 卡启动 | ✅ **已闭环，但依赖 eMMC 中的社区 U-Boot**。eMMC 前 16 MiB 全零时 BootROM 不会读取 SD 并直接进入 Maskrom；写入与镜像匹配的 `u-boot-rockchip.bin` 后，系统可从 TF 正常启动 |
+| 音频 | ⚠️ **部分闭环**。ES8388 扬声器 DAPM/模拟链路已验证，默认 sink 与输出档位已修正；PDM 内置麦克风冷启动后有短时非零数据，但持续采集仍会停顿；Audio 耳麦、LINE IN、耳机自动切换仍待完善 |
 
 ### I2C4 设备修复说明
 
@@ -192,8 +198,8 @@ I2C6: LT6911UXC2 0x2b, STK8BAxx 0x18, HUSB311 0x4e
 显示链路：
 
 ```text
-VOP2 VP0 --> HDMI1 --> HDMI-A
-VOP2 VP1 --> DP0 --> USB-C DP Alt Mode
+VOP2 VP0 --> DP0 --> USB-C DP Alt Mode
+VOP2 VP1 --> HDMI1 --> HDMI-A
 VOP2 VP2 --> eDP0 --> optional internal eDP panel
 VOP2 VP3 --> DSI1 4-lane --> LT9211 --> dual-link LVDS 24-bit
                                               |
@@ -358,7 +364,12 @@ VP2、PWM6 背光和 AUX panel 描述，但默认全部 disabled；启用实际 
    1024×768。装配 eDP 面板时需在同一 DTS 中启用 eDP0、VP2 和 AUX
    panel 状态；面板应提供 EDID，无 EDID 时必须补准确时序。
 4. 内屏是双通道 VESA-24 LVDS。只配一条 LVDS link 会把桌面裁成半幅并使像素时基错乱；原厂 mode 3 的 `0x855c = 0x07` 通道使能已由板级内核补丁补齐。
-5. Type-C DP 未闭环。历史双 lane 配置曾验证 4K30，但当前最终基线在
-   Type-C partner/Alt Mode 阶段反复 attach/detach，`DP-1` 常保持
-   `disconnected`。不能仅凭 DTS 中仍存在 `<2 3>` lane mux 就宣称可用。
-6. 设备树只描述内核侧硬件，正式启动仍依赖匹配的 loader、U-Boot、内存初始化和根文件系统。
+5. Type-C DP 基线已闭环：HBR3 虽能完成训练但其视频流异常，因此当前把
+   链路限制为 two-lane HBR2，并强制 RGB444 8bpc；DP0 使用 VP0，
+   HDMI1 使用 VP1。1080p60 和 4K30 已在直连及扩展坞两条链路出图。
+   two-lane HBR2 不支持完整 RGB 4K60；4K60 属于后续实验项。
+6. TF 启动不是“eMMC 完全为空也能直接启动”。BootROM 阶段没有把
+   GPIO4_C3 的 SD 供电拉起，因此 eMMC 至少要保留社区
+   `u-boot-rockchip.bin`；完整 rootfs 仍可从 TF 启动。详见
+   `reports/tf-boot-empty-emmc-20261121/README.md`。
+7. 设备树只描述内核侧硬件，正式启动仍依赖匹配的 loader、U-Boot、内存初始化和根文件系统。

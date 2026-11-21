@@ -671,12 +671,19 @@
 };
 
 &dp0 {
+	/*
+	 * The one-cable monitor advertises 10 bpc, but the RK3588 USB-C DP
+	 * path trains and then scans out a black image in that format.
+	 */
+	rockchip,force-8bpc;
+	/* HBR3 training succeeds, but the sink cannot decode its video stream. */
+	rockchip,max-link-rate = <540000>;
 	status = "okay";
 };
 
 &dp0_in {
-	dp0_in_vp1: endpoint {
-		remote-endpoint = <&vp1_out_dp0>;
+	dp0_in_vp0: endpoint {
+		remote-endpoint = <&vp0_out_dp0>;
 	};
 };
 
@@ -778,8 +785,8 @@
 };
 
 &hdmi1_in {
-	hdmi1_in_vp0: endpoint {
-		remote-endpoint = <&vp0_out_hdmi1>;
+	hdmi1_in_vp1: endpoint {
+		remote-endpoint = <&vp1_out_hdmi1>;
 	};
 };
 
@@ -1883,8 +1890,6 @@
 };
 
 &vop {
-	assigned-clocks = <&cru DCLK_VOP2_SRC>;
-	assigned-clock-parents = <&cru PLL_V0PLL>;
 	status = "okay";
 };
 
@@ -1893,16 +1898,16 @@
 };
 
 &vp0 {
-	vp0_out_hdmi1: endpoint@ROCKCHIP_VOP2_EP_HDMI1 {
-		reg = <ROCKCHIP_VOP2_EP_HDMI1>;
-		remote-endpoint = <&hdmi1_in_vp0>;
+	vp0_out_dp0: endpoint@ROCKCHIP_VOP2_EP_DP0 {
+		reg = <ROCKCHIP_VOP2_EP_DP0>;
+		remote-endpoint = <&dp0_in_vp0>;
 	};
 };
 
 &vp1 {
-	vp1_out_dp0: endpoint@a {
-		reg = <ROCKCHIP_VOP2_EP_DP0>;
-		remote-endpoint = <&dp0_in_vp1>;
+	vp1_out_hdmi1: endpoint@ROCKCHIP_VOP2_EP_HDMI1 {
+		reg = <ROCKCHIP_VOP2_EP_HDMI1>;
+		remote-endpoint = <&hdmi1_in_vp1>;
 	};
 };
 
