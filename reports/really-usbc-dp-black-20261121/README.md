@@ -11,8 +11,9 @@ HPD、EDID 和链路训练，但显示器只有背光、没有图像。问题在
 Applicable branch: `/home/user/github/build` Armbian edge, Linux 7.3.y
 rockchip64；设备 DTS 源位于 `dts-7.3-linux/`。
 
-Environment: Really TVI2340R, RK3588, HUSB311 TCPC, two-lane USB-C DP
-Alt Mode, VOP2, internal LT9211 dual-link LVDS panel.
+Environment: Really TVI2340R, RK3588, HUSB311 TCPC, Type-C DP Alt Mode
+with dynamic two/four-lane pin assignments, VOP2, internal LT9211
+dual-link LVDS panel.
 
 ## 最终可用配置
 
@@ -20,7 +21,7 @@ Alt Mode, VOP2, internal LT9211 dual-link LVDS panel.
 
 1. `&dp0` 保留 `rockchip,force-8bpc`，避免显示器选择 10/12/16bpc。
 2. `&dp0` 增加 `rockchip,max-link-rate = <540000>`，把链路限制为
-   two-lane HBR2（5.4 Gbps/lane）。
+   HBR2（5.4 Gbps/lane）。
 3. DP0 改走 VP0，HDMI1 改走 VP1，LVDS 继续使用 VP3。
 
 ```dts
@@ -142,7 +143,13 @@ DP bus format RGB888_1X24
 直连链路 `Type-C one-cable -> monitor`：
 
 ```text
+full-training link: 4 lanes at 5400 MHz
+clock recovery succeeded
+channel equalization succeeded
+DP bus format: RGB888_1X24
+DP MSA: RGB444, 8bpc
 3840x2160p30: image OK
+3840x2160p60: image OK and stable
 ```
 
 升级后的 VOP 拓扑：
@@ -156,10 +163,24 @@ Video Port3 -> DSI1 -> LT9211 -> dual-link LVDS
 在正确绘制后，DP 通用中断中的
 `VIDEO_FIFO_OVERFLOW_STREAM0` 状态可清为 0，并在持续出图期间保持为 0。
 
+## two-lane 与 four-lane 的运行时选择
+
+板级 DTS 保留 `<2 3>`，表示优先支持“两 lane DP + USB3”的映射。运行时
+Type-C mux 会根据伙伴的 pin assignment 选择最终模式：
+
+- `C/E`：四条高速 pair 全部切给 DP，PHY 报告 4 lanes。直连显示器属于
+  这一类，已验证 four-lane HBR2 RGB444 4K60。
+- `D/F`：两 lane 给 DP，另外两 lane 保留 USB3。当前扩展坞属于这一类，
+  在 HBR2 上限下验证 4K30。
+
+因此不需要把 `rockchip,dp-lane-mux` 静态改成 `<0 1 2 3>`。静态改成
+four-lane 反而会破坏 D/F 下“两 lane DP + USB3”的映射语义。
+
 ## 当前限制与待回归项
 
-- 当前 `rockchip,max-link-rate = <540000>` 是 two-lane HBR2 上限，
-  已验证 4K30，不可据此宣称 two-lane 4K60 已支持。
+- four-lane 模式占用全部 Type-C 高速 pair，不能同时使用 USB3。
+- 两 lane 扩展坞模式在 HBR2 上限下只能验证 4K30；完整 RGB 4K60 依赖
+  Type-C pin assignment 进入 `C/E` four-lane 模式。
 - 尚未做单变量二分来证明“VP0 路由”和“HBR2 限速”各自是否单独充分；
   当前只把两者同时实机验证通过的组合作为生产基线。
 - 需要补做多次冷启动、热插拔和 Type-C 正反插回归。

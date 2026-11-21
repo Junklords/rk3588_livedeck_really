@@ -77,17 +77,23 @@ quality remain open. See `../reports/audio-mic-linein-20261117/README.md`.
 - HUSB311 owns VBUS through `vbus-supply`. `u2phy0_otg` must not bind the
   same regulator as `phy-supply`.
 - USB-A host power is controlled from GPIO3_A5.
-- The production DP baseline uses two Type-C lanes while USB3 uses the
-  other two lanes.
+- The DTS keeps the preferred two-lane mapping `<2 3>`. The Type-C mux
+  dynamically expands pin assignments C/E to four DP lanes and uses
+  two-lane DP plus USB3 for assignments D/F.
 
 Validated result on 2026-11-21:
 
 - DP0 is routed through VOP2 VP0; HDMI1 uses VP1.
-- The DP link is capped at two-lane HBR2 (`540000`) and RGB444 8bpc.
+- The DP link is capped at HBR2 (`540000`) and RGB444 8bpc.
 - HBR3 completed clock recovery and channel equalization, but its video
   stream remained unusable. HBR2 restored scanout.
 - 1080p60 and 3840x2160@30 produced an image through both a direct
   one-cable monitor and `Type-C -> dock -> HDMI`.
+- The direct monitor negotiated pin assignment C and trained four HBR2
+  lanes. Full RGB444 3840x2160@60 then produced a stable image at 8bpc.
+- Four-lane DP reserves every Type-C high-speed pair, so USB3 is not
+  available in that mode. Two-lane dock mode retains USB3 and is limited
+  to 4K30 at the current HBR2 cap.
 - `VIDEO_FIFO_OVERFLOW_STREAM0` remains clear during sustained 4K30.
 
 The opt-in kernel properties are implemented by:
@@ -97,9 +103,9 @@ The opt-in kernel properties are implemented by:
 0018-drm-bridge-dw-dp-allow-board-link-rate-cap.patch
 ```
 
-Two-lane HBR2 does not have enough payload bandwidth for full RGB444
-4K60. Four-lane HBR2 and YCbCr subsampling remain explicit follow-up
-experiments rather than production claims.
+No static four-lane DTS override is needed: the baseline `<2 3>` property
+is the preferred mapping, while the Type-C mux selects the final lane
+count from the negotiated pin assignment.
 
 ### PCIe, Wi-Fi and Bluetooth
 
@@ -320,10 +326,10 @@ click. The click is more likely ES8388/amplifier power-on or mute timing.
 4. HDMI output can remain logically connected after cable removal, causing
    EDID I2C retries and a compositor stall. The image currently starts HDMI
    disabled by default.
-5. Type-C DP is closed for 4K30. The prior HBR3 path trained yet produced a
-   black image, so the production DTS caps the link at HBR2 and keeps RGB444
-   8bpc. Full RGB 4K60 needs four-lane HBR2, a functioning HBR3 video path,
-   or chroma subsampling, and remains open.
+5. Type-C DP is closed for both two-lane dock 4K30 and direct four-lane
+   4K60. The prior HBR3 path trained yet produced a black image, so the
+   production DTS caps the link at HBR2 and keeps RGB444 8bpc. Direct
+   four-lane operation does not retain USB3.
 6. TF boot is closed. A cold boot through the community SPL/U-Boot chain
    mounted ext4 UUID `7faf7863-d5d5-419e-81bd-902914de6883` from
    `/dev/mmcblk1p1`.

@@ -69,7 +69,7 @@ SHA256: D516E8F62CE040E76CAB2CBC394DBE46AB53F3F82E9CEC1ED8E5714F51358521
 | SD 卡 | 4 bit SDMMC，UHS SDR104，独立 3.3 V 供电控制 |
 | 内屏 | 15.6 吋竖屏；DSI1 4-lane → LT9211 → 双通道 odd/even 24 bit VESA LVDS。控制器扫描 1920×1080@60，DT 提供 270° 方向，桌面和 fbcon 均呈 1080×1920 竖屏 |
 | 备用内屏 | eDP0 是板级物理接口和可选内屏装配路径；同一 DTS 保留 VP2/eDP0/AUX panel 拓扑，但默认将控制器与整条 route 标为 disabled |
-| 外部显示 | HDMI1；DP0（USB-C DP Alt Mode）采用 two-lane HBR2 + 8bpc，直连和扩展坞链路均已验证 4K30 |
+| 外部显示 | HDMI1；DP0（USB-C DP Alt Mode）采用 HBR2 + 8bpc。扩展坞使用 two-lane DP，4K30；直连显示器会按 pin assignment 动态切到 four-lane DP，4K60 RGB 已验证 |
 | 有线网络 | GMAC0，RGMII，PHY 地址 1 |
 | PCIe | PCIe 2.0 x1 lane 1 与 lane 2，两路均启用 |
 | USB | USB3 OTG0、USB3 Host1、两路 USB2 Host、HUSB311 Type-C 双角色电源/数据，Sink/Source 均为固定 5V/3A |
@@ -94,7 +94,7 @@ SHA256: D516E8F62CE040E76CAB2CBC394DBE46AB53F3F82E9CEC1ED8E5714F51358521
 | --- | --- |
 | LVDS 内屏 | `LVDS-1 connected`，双链路画面正常 |
 | HDMI OUT | 当前未接显示器，`HDMI-A-1 disconnected` |
-| USB-C DP | ✅ **基线可用**。DP0→VP0，两 lane HBR2（5.4 Gbps/lane），RGB444 8bpc；1080p60、4K30、直连一线通和 Type-C 扩展坞均已出图 |
+| USB-C DP | ✅ **基线可用**。DP0→VP0，HBR2（5.4 Gbps/lane），RGB444 8bpc；扩展坞 two-lane 4K30 正常，直连 four-lane 4K60 正常。four-lane 模式下 USB3 不可同时使用 |
 | GT9110 触控 | ✅ **已工作**。`ID 9110`；随 270° 面板方向使用 `inverted-x + swapped-x-y`，九点映射验证通过 |
 | HYM8563 RTC | ✅ **已工作**。`registered as rtc0` |
 | I2C4 控制器 | `0x14` / `0x2d` / `0x51` 均正常绑定；`0x56` EEPROM 不 ACK |
@@ -365,9 +365,10 @@ VP2、PWM6 背光和 AUX panel 描述，但默认全部 disabled；启用实际 
    panel 状态；面板应提供 EDID，无 EDID 时必须补准确时序。
 4. 内屏是双通道 VESA-24 LVDS。只配一条 LVDS link 会把桌面裁成半幅并使像素时基错乱；原厂 mode 3 的 `0x855c = 0x07` 通道使能已由板级内核补丁补齐。
 5. Type-C DP 基线已闭环：HBR3 虽能完成训练但其视频流异常，因此当前把
-   链路限制为 two-lane HBR2，并强制 RGB444 8bpc；DP0 使用 VP0，
-   HDMI1 使用 VP1。1080p60 和 4K30 已在直连及扩展坞两条链路出图。
-   two-lane HBR2 不支持完整 RGB 4K60；4K60 属于后续实验项。
+   链路速率限制为 HBR2，并强制 RGB444 8bpc；DP0 使用 VP0，HDMI1 使用
+   VP1。扩展坞按 two-lane 运行并验证 4K30；直连显示器按 Type-C pin
+   assignment 动态切到 four-lane，已验证 RGB444 4K60。four-lane 模式
+   是否可用由显示器和线缆的 pin assignment 决定，该模式不保留 USB3。
 6. TF 启动不是“eMMC 完全为空也能直接启动”。BootROM 阶段没有把
    GPIO4_C3 的 SD 供电拉起，因此 eMMC 至少要保留社区
    `u-boot-rockchip.bin`；完整 rootfs 仍可从 TF 启动。详见
