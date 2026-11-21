@@ -27,49 +27,39 @@
 #include <media/v4l2-subdev.h>
 
 /* Chip registers (from vendor lt6911uxc.h) */
-#define LT6911UXC_CHIPID_H	0x8101
-#define LT6911UXC_CHIPID_L	0x8100
-#define LT6911UXC_CHIPID_VAL	0x0417  /* LT6911UXC */
-#define LT6911UXC2_CHIPID_VAL	0x122C  /* LT6911UXC2 (实测 2026-11-19) */
-
+/* Real register map, extracted 2026-11-21 by disassembling the OEM
+ * lt6911uxc2 driver in the Android 5.10.110 boot image (boot_a.img):
+ *   - ID registers are 0xa000/0xa001, expected 0x0516 (NOT 0x8100!)
+ *   - 0x80ee is a doorbell: 1 before each register-access group, 0 after
+ *   - timing regs live in the 0xd2xx window, values are half the pixel count
+ *   - there is NO init/firmware-download sequence; the chip self-boots */
 #define LT6911UXC_I2C_EN_REG	0x80EE
-
-/* HDMI timing registers */
-#define LT6911UXC_HTOTAL_H	0x867c
-#define LT6911UXC_HTOTAL_L	0x867d
-#define LT6911UXC_HACT_H	0x8680
-#define LT6911UXC_HACT_L	0x8681
-#define LT6911UXC_VTOTAL_H	0x867a
-#define LT6911UXC_VTOTAL_L	0x867b
-#define LT6911UXC_VACT_H	0x867e
-#define LT6911UXC_VACT_L	0x867f
-#define LT6911UXC_HFP_H		0x8678
-#define LT6911UXC_HFP_L		0x8679
-#define LT6911UXC_HS_H		0x8672
-#define LT6911UXC_HS_L		0x8673
-#define LT6911UXC_HBP_H		0x8676
-#define LT6911UXC_HBP_L		0x8677
-#define LT6911UXC_VBP		0x8674
-#define LT6911UXC_VFP		0x8675
-#define LT6911UXC_VS		0x8671
-
-#define LT6911UXC_TMDS_CLK_H	0x8750
-#define LT6911UXC_TMDS_CLK_M	0x8751
-#define LT6911UXC_TMDS_CLK_L	0x8752
-
-#define LT6911UXC_MIPI_LANES	0x86a2
-#define LT6911UXC_INT_STATUS_A	0x86a3
-#define LT6911UXC_INT_STATUS_B	0x86a5
-#define LT6911UXC_INT_COMPARE	0x86a6
-
-#define LT6911UXC_STREAM_CTRL	0x811d
-#define LT6911UXC_STREAM_ENABLE	0xFB
-#define LT6911UXC_STREAM_DISABLE	0xBB
-
-#define LT6911UXC_AUDIO_STATUS	0xb081
-#define LT6911UXC_COLOR_FMT	0xb092
-
-/* DT compatible */
+#define LT6911UXC_CHIPID_L	0xa000
+#define LT6911UXC_CHIPID_H	0xa001
+#define LT6911UXC_CHIPID_VAL	0x0516
+#define LT6911UXC_FW_VER_A	0x86a7
+#define LT6911UXC_FW_VER_D	0x86aa
+#define LT6911UXC_CLK_MEAS	0xa034
+#define LT6911UXC_CLK_MEAS_START	0x21
+#define LT6911UXC_TIMING_TRIGGER	0xd283
+#define LT6911UXC_PIXCLK_19_16	0xb8b1
+#define LT6911UXC_PIXCLK_15_8	0xb8b2
+#define LT6911UXC_PIXCLK_7_0	0xb8b3
+#define LT6911UXC_VSYNC		0xd286
+#define LT6911UXC_VBPP		0xd287
+#define LT6911UXC_VFP		0xd288
+#define LT6911UXC_VTOTAL_H	0xd289
+#define LT6911UXC_VTOTAL_L	0xd28a
+#define LT6911UXC_HACT_H	0xd28b
+#define LT6911UXC_HACT_L	0xd28c
+#define LT6911UXC_HSYNC_H	0xd294
+#define LT6911UXC_HSYNC_L	0xd295
+#define LT6911UXC_VACT_H	0xd296
+#define LT6911UXC_VACT_L	0xd297
+#define LT6911UXC_HBP_H		0xd298
+#define LT6911UXC_HBP_L		0xd299
+#define LT6911UXC_HFP_H		0xd29c
+#define LT6911UXC_HFP_L		0xd29d
 #define LT6911UXC2_NAME		"lt6911uxc2"
 
 struct lt6911uxc2 {
@@ -155,34 +145,48 @@ static int lt6911uxc2_read16(struct lt6911uxc2 *priv, u16 reg_h, u16 reg_l,
 	return 0;
 }
 
+/* Register-access doorbell: the OEM driver writes 0x80ee=1 before every
+ * access group and 0x80ee=0 after. Unwrapped reads return garbage. */
+static int lt6911uxc2_i2c_enable(struct lt6911uxc2 *priv)
+{
+	return lt6911uxc2_write(priv, LT6911UXC_I2C_EN_REG, 0x01);
+}
+
+static void lt6911uxc2_i2c_disable(struct lt6911uxc2 *priv)
+{
+	lt6911uxc2_write(priv, LT6911UXC_I2C_EN_REG, 0x00);
+}
+
 /* --- Chip identity --- */
 
 static int lt6911uxc2_check_chip_id(struct lt6911uxc2 *priv)
 {
-	u16 chip_id = 0;
-	int ret, i;
+	u8 id_l = 0, id_h = 0, v[4] = { 0 };
+	u16 chip_id;
+	int ret;
 
-	/* Pure reader: the latch is opened in probe() after the reset.
-	 * The chip firmware needs up to ~2 s after reset release. */
-	for (i = 0; i < 10; i++) {
-		ret = lt6911uxc2_read16(priv, LT6911UXC_CHIPID_H,
-					 LT6911UXC_CHIPID_L, &chip_id);
-		if (!ret && chip_id)
-			break;
-		msleep(200);
-	}
-
-	if (ret && ret != -EIO)
+	ret = lt6911uxc2_i2c_enable(priv);
+	if (ret)
 		return ret;
 
-	if (chip_id != LT6911UXC_CHIPID_VAL &&
-	    chip_id != LT6911UXC2_CHIPID_VAL) {
-		dev_warn(&priv->client->dev,
-			 "unexpected chip ID 0x%04x (expected 0x%04x or 0x%04x), continuing\n",
-			 chip_id, LT6911UXC_CHIPID_VAL, LT6911UXC2_CHIPID_VAL);
-	}
+	lt6911uxc2_read(priv, LT6911UXC_CHIPID_L, &id_l);
+	lt6911uxc2_read(priv, LT6911UXC_CHIPID_H, &id_h);
+	lt6911uxc2_read(priv, LT6911UXC_FW_VER_A, &v[0]);
+	lt6911uxc2_read(priv, LT6911UXC_FW_VER_A + 1, &v[1]);
+	lt6911uxc2_read(priv, LT6911UXC_FW_VER_A + 2, &v[2]);
+	lt6911uxc2_read(priv, LT6911UXC_FW_VER_A + 3, &v[3]);
+	lt6911uxc2_i2c_disable(priv);
 
-	dev_info(&priv->client->dev, "LT6911UXC2 chip ID: 0x%04x\n", chip_id);
+	chip_id = (id_h << 8) | id_l;
+	if (chip_id != LT6911UXC_CHIPID_VAL) {
+		dev_err(&priv->client->dev,
+			"chip ID 0x%04x != expected 0x%04x\n",
+			chip_id, LT6911UXC_CHIPID_VAL);
+		return -ENODEV;
+	}
+	dev_info(&priv->client->dev,
+		 "LT6911UXC2 chip ID 0x%04x, fw 0x%02x%02x%02x%02x\n",
+		 chip_id, v[0], v[1], v[2], v[3]);
 	return 0;
 }
 
@@ -191,101 +195,81 @@ static int lt6911uxc2_check_chip_id(struct lt6911uxc2 *priv)
 static int lt6911uxc2_get_detected_timings(struct lt6911uxc2 *priv,
 					   struct v4l2_dv_timings *timings)
 {
-	u16 htotal, hact, vtotal, vact, hfp, hs, hbp, tmds_clk;
-	u8 vs, vbp, vfp, lanes;
+	u8 vh = 0, vl = 0, hh = 0, hl = 0, c19 = 0, c15 = 0, c7 = 0;
+	u8 vsh = 0, vsl = 0, vfph = 0, vfpl = 0, vfp = 0;
+	u16 hact, vact, hsync, hfp, hbp;
+	u64 pixclk;
+	u32 htotal, vtotal;
 	int ret;
 
 	memset(timings, 0, sizeof(*timings));
 	timings->type = V4L2_DV_BT_656_1120;
 
-	ret = lt6911uxc2_read16(priv, LT6911UXC_HTOTAL_H, LT6911UXC_HTOTAL_L,
-				&htotal);
-	if (ret)
-		return ret;
-	ret = lt6911uxc2_read16(priv, LT6911UXC_HACT_H, LT6911UXC_HACT_L,
-				&hact);
-	if (ret)
-		return ret;
-	ret = lt6911uxc2_read16(priv, LT6911UXC_VTOTAL_H, LT6911UXC_VTOTAL_L,
-				&vtotal);
-	if (ret)
-		return ret;
-	ret = lt6911uxc2_read16(priv, LT6911UXC_VACT_H, LT6911UXC_VACT_L,
-				&vact);
-	if (ret)
-		return ret;
-	ret = lt6911uxc2_read16(priv, LT6911UXC_HFP_H, LT6911UXC_HFP_L, &hfp);
-	if (ret)
-		return ret;
-	ret = lt6911uxc2_read16(priv, LT6911UXC_HS_H, LT6911UXC_HS_L, &hs);
-	if (ret)
-		return ret;
-	ret = lt6911uxc2_read16(priv, LT6911UXC_HBP_H, LT6911UXC_HBP_L, &hbp);
-	if (ret)
-		return ret;
-	ret = lt6911uxc2_read16(priv, LT6911UXC_TMDS_CLK_H,
-				LT6911UXC_TMDS_CLK_L, &tmds_clk);
-	if (ret)
-		return ret;
-	ret = lt6911uxc2_read(priv, LT6911UXC_VS, &vs);
-	if (ret)
-		return ret;
-	ret = lt6911uxc2_read(priv, LT6911UXC_VBP, &vbp);
-	if (ret)
-		return ret;
-	ret = lt6911uxc2_read(priv, LT6911UXC_VFP, &vfp);
-	if (ret)
-		return ret;
-	ret = lt6911uxc2_read(priv, LT6911UXC_MIPI_LANES, &lanes);
+	ret = lt6911uxc2_i2c_enable(priv);
 	if (ret)
 		return ret;
 
-	if (hact == 0 || vact == 0) {
-		dev_dbg(&priv->client->dev, "no signal (hact=%u vact=%u)\n",
-			hact, vact);
-		return -ENOLINK;
-	}
+	/* clock measurement: start, wait 12 ms, read 20-bit value in 2 kHz units */
+	lt6911uxc2_write(priv, LT6911UXC_CLK_MEAS, LT6911UXC_CLK_MEAS_START);
+	usleep_range(12000, 13000);
+	lt6911uxc2_read(priv, LT6911UXC_PIXCLK_19_16, &c19);
+	lt6911uxc2_read(priv, LT6911UXC_PIXCLK_15_8, &c15);
+	lt6911uxc2_read(priv, LT6911UXC_PIXCLK_7_0, &c7);
 
-	/* Sanity gate: this UXC2's register map differs from the UXC1 map
-	 * these offsets were taken from; unlocked/counter values would
-	 * otherwise poison the media pipeline with absurd formats. */
-	if (hact < 120 || hact > 8000 || vact < 120 || vact > 4400 ||
-	    htotal <= hact || vtotal <= vact) {
-		dev_dbg(&priv->client->dev,
-			"implausible timing (h=%u/%u v=%u/%u), treating as no signal\n",
-			hact, htotal, vact, vtotal);
+	/* stable-timing capture trigger, wait 10 ms */
+	lt6911uxc2_write(priv, LT6911UXC_TIMING_TRIGGER, 0x10);
+	usleep_range(10000, 11000);
+
+	lt6911uxc2_read(priv, LT6911UXC_HACT_H, &hh);
+	lt6911uxc2_read(priv, LT6911UXC_HACT_L, &hl);
+	lt6911uxc2_read(priv, LT6911UXC_VACT_H, &vh);
+	lt6911uxc2_read(priv, LT6911UXC_VACT_L, &vl);
+	lt6911uxc2_read(priv, LT6911UXC_HSYNC_H, &vsh);
+	lt6911uxc2_read(priv, LT6911UXC_HSYNC_L, &vsl);
+	lt6911uxc2_read(priv, LT6911UXC_HFP_H, &vfph);
+	lt6911uxc2_read(priv, LT6911UXC_HFP_L, &vfpl);
+	lt6911uxc2_read(priv, LT6911UXC_HBP_H, &vsh);
+	lt6911uxc2_read(priv, LT6911UXC_HBP_L, &vsl);
+	lt6911uxc2_read(priv, LT6911UXC_VFP, &vfp);
+
+	lt6911uxc2_i2c_disable(priv);
+
+	hact = ((hh << 8) | hl) * 2;
+	vact = ((vh << 8) | vl) * 2;
+	hsync = ((vsh << 8) | vsl) * 2;
+	hfp = ((vfph << 8) | vfpl) * 2;
+	hbp = ((vsh << 8) | vsl) * 2;
+	pixclk = (((c19 & 0xf) << 16) | (c15 << 8) | c7) * 2000ULL;
+	htotal = hact + hsync + hfp + hbp;
+	vtotal = vact + vfph + vfpl + vfp;
+
+	if (hact < 320 || hact > 8000 || vact < 200 || vact > 4400 ||
+	    !pixclk || htotal <= hact || vtotal <= vact)
 		return -ENOLINK;
-	}
 
 	timings->bt.width = hact;
 	timings->bt.height = vact;
 	timings->bt.hfrontporch = hfp;
-	timings->bt.hsync = hs;
+	timings->bt.hsync = hsync;
 	timings->bt.hbackporch = hbp;
 	timings->bt.vfrontporch = vfp;
-	timings->bt.vsync = vs;
-	timings->bt.vbackporch = vbp;
-	timings->bt.pixelclock = (u64)tmds_clk * 5000; /* TMDS/2 = pixel clock */
+	timings->bt.pixelclock = pixclk;
 	timings->bt.interlaced = V4L2_DV_PROGRESSIVE;
 	timings->bt.polarities = V4L2_DV_HSYNC_POS_POL | V4L2_DV_VSYNC_POS_POL;
 
-	dev_info(&priv->client->dev,
-		 "timing: %ux%u@%lluHz hfp=%u hs=%u hbp=%u vfp=%u vs=%u vbp=%u lanes=%u\n",
-		 hact, vact, timings->bt.pixelclock,
-		 hfp, hs, hbp, vfp, vs, vbp, lanes);
+	dev_dbg(&priv->client->dev,
+		"%ux%u@%lluHz hfp=%u hs=%u hbp=%u vfp=%u\n",
+		hact, vact, pixclk, hfp, hsync, hbp, vfp);
 
 	return 0;
 }
 
 static int lt6911uxc2_g_tx_5v(struct lt6911uxc2 *priv)
 {
-	u8 status;
-	int ret;
-
-	ret = lt6911uxc2_read(priv, LT6911UXC_AUDIO_STATUS, &status);
-	if (ret)
-		return 0;
-	return !!(status & BIT(0));
+	/* No chip-side 5V status register exists in the OEM map; the real
+	 * driver samples a plugin-det GPIO we do not wire. Treat timings
+	 * validity as the signal indicator during bring-up. */
+	return 1;
 }
 
 /* --- Stream control --- */
@@ -293,19 +277,15 @@ static int lt6911uxc2_g_tx_5v(struct lt6911uxc2 *priv)
 static int lt6911uxc2_s_stream(struct v4l2_subdev *sd, int enable)
 {
 	struct lt6911uxc2 *priv = to_lt6911uxc2(sd);
-	int ret;
 
+	/* OEM banked driver performs NO register writes on stream on/off:
+	 * the chip streams autonomously once locked. Only manage HPD. */
 	dev_dbg(&priv->client->dev, "%s stream\n",
 		enable ? "enable" : "disable");
+	if (priv->hpd_gpio)
+		gpiod_set_value_cansleep(priv->hpd_gpio, enable ? 1 : 0);
 
-	ret = lt6911uxc2_write(priv, LT6911UXC_STREAM_CTRL,
-			       enable ? LT6911UXC_STREAM_ENABLE :
-					LT6911UXC_STREAM_DISABLE);
-	if (ret)
-		dev_err(&priv->client->dev, "failed to %s stream: %d\n",
-			enable ? "enable" : "disable", ret);
-
-	return ret;
+	return 0;
 }
 
 /* --- V4L2 subdev ops --- */
@@ -475,25 +455,9 @@ static void lt6911uxc2_res_change_work(struct work_struct *work)
 static irqreturn_t lt6911uxc2_irq_handler(int irq, void *dev_id)
 {
 	struct lt6911uxc2 *priv = dev_id;
-	u8 int_a, int_b;
-	int ret;
 
-	ret = lt6911uxc2_read(priv, LT6911UXC_INT_STATUS_A, &int_a);
-	if (ret)
-		return IRQ_HANDLED;
-	ret = lt6911uxc2_read(priv, LT6911UXC_INT_STATUS_B, &int_b);
-	if (ret)
-		return IRQ_HANDLED;
-
-	if (int_a & 0x01) {
-		/* Format changed */
-		schedule_delayed_work(&priv->work_res_change,
-				      msecs_to_jiffies(50));
-	}
-
-	/* Clear interrupts */
-	lt6911uxc2_write(priv, LT6911UXC_INT_STATUS_A, int_a);
-	lt6911uxc2_write(priv, LT6911UXC_INT_STATUS_B, int_b);
+	/* No readable INT status registers in the OEM map: just poll. */
+	schedule_delayed_work(&priv->work_res_change, msecs_to_jiffies(20));
 
 	return IRQ_HANDLED;
 }
