@@ -2,6 +2,7 @@
 
 - 作者：OpenAI Codex（GPT-5），执行端：user
 - 生成时间：2026-11-17T00:20:00+08:00
+- 最近更新：2026-11-22T10:15:00+08:00
 - 适用设备：Really / 锐丽 TVI2340R，RK3588，型号 `22011211C`
 - 适用硬件仓：`/home/user/device/rk3588-really/rk3588_livedeck_really`
 - 适用构建仓：`/home/user/github/build`
@@ -15,8 +16,8 @@
   使用 `#76`，后续仍需在最终镜像中重新验收
 - 最近实机回归：2026-11-21，冷启动后 PDM 能出现非零采样，但持续采集仍会
   在约 0.8 秒后停顿；已试过厂家驱动的 clock/filter delay，未闭环，补丁已撤回。
-  扬声器静音 PCM 链路验证进入 `DAPM On`，模拟输出档位与默认 sink 已修正并
-  固化到构建树
+  2026-11-22 根据 TF 启动听感反馈，把扬声器默认从 `27/189` 提升到
+  `33/192`；完整镜像已重建，待下一次实机听感确认。
 
 ## 0. 接手规则：必须记录并回填进展
 
@@ -87,7 +88,7 @@
 
 | 项目 | 状态 | 说明 |
 | --- | --- | --- |
-| ES8388 播放 | ✅ 硬件链路通过，待听感确认 | 冷启动后默认 sink 为 ES8388；`Output 1/2 = 27 (-3 dB)`、`PCM = 189`；静音 PCM 下 `Speaker`、功放 `VCC/DRV`、`LOUT2/ROUT2` 全部为 `On` |
+| ES8388 播放 | ✅ 硬件链路通过，响度待新一轮确认 | 冷启动后默认 sink 为 ES8388；耳机 `Output 1 = 27 (-3 dB)`、扬声器 `Output 2 = 33 (+3 dB)`、`PCM = 192 (0 dB)`；静音 PCM 下 `Speaker`、功放 `VCC/DRV`、`LOUT2/ROUT2` 全部为 `On` |
 | ES8388 耳机检测 | ⚠️ 待完善 | GPIO4_B3 检测、GPIO4_B4 耳机功放使能；需验证插拔自动切换 |
 | ES8388 Audio 耳麦输入 | ❌ 未闭环 | 原厂走 Line 1；mainline 当前所有已试路由均为数字零 |
 | 独立 LINE IN | ❌ 未闭环 | 原厂走 Line 2，并由 GPIO1_B6 handler 动态切换 |
@@ -461,12 +462,22 @@ PDM clocks/DMA/pins
 ```text
 /home/user/github/build/userpatches/overlay/really-audio/usr/local/sbin/really-audio-route
 /home/user/github/build/userpatches/overlay/really-audio/etc/systemd/system/really-audio-route.service
+/home/user/github/build/userpatches/overlay/really-audio/etc/default/really-audio
 ```
 
-服务在 `sound.target` 后把扬声器开关打开、`Output 1/2` 设为 `27`、
-`PCM` 设为 `189`。WirePlumber 规则同时设置 ES8388 的
-`priority.driver` 和 `priority.session` 为 `2000`，避免 HDMI PCM 成为默认
-sink。
+服务在 `sound.target` 后把扬声器开关打开。初始试音档 `27/189`（合计约
+`-4.5 dB`）在实际 TF 启动测试中偏小，因此 2026-11-22 调整为：
+
+```text
+Output 1 headphone = 27 (-3 dB)
+Output 2 speaker   = 33 (+3 dB)
+PCM                = 192 (0 dB)
+```
+
+没有直接使用 `36 (+6 dB)` 满档，以保留功放和电源的瞬态余量。上述值可通过
+镜像内 `/etc/default/really-audio` 单独调整。WirePlumber 规则同时设置
+ES8388 的 `priority.driver` 和 `priority.session` 为 `2000`，避免 HDMI PCM
+成为默认 sink。
 
 ### 5.3 mainline 驱动差异和风险
 
@@ -755,8 +766,9 @@ amixer -c Really-ES8388 contents
 - [ ] 实现 Audio/LINE IN 动态路由。
 - [ ] 验证耳机插入后扬声器关闭、耳机输出启用。
 - [ ] 回归扬声器低频 hum、pop/click 和偏置时序。
-- [ ] 用户实际听一次低音量扬声器测试，确认可闻响度。
-- [ ] 用下一次完整 Armbian 镜像回归 `really-audio-route.service` 和默认 sink。
+- [ ] 用新镜像实际听一次普通音量测试，确认 `33/192` 的响度和失真都可接受。
+- [x] 完整 Armbian 镜像已重新构建，并核验 `/etc/default/really-audio`、
+  `really-audio-route.service` 和默认 sink 配置已落盘。
 - [x] 验证厂家驱动的 DMIC 上电等待和滤波器初始化时序；不足以闭环，补丁已撤回。
 - [ ] 对比原厂 Android 运行中的 PDM 寄存器/供电，确认 DMIC 数据 lane 与板级
   电源；要求至少 60 秒连续 48 kHz 采集。
@@ -807,6 +819,7 @@ amixer -c Really-ES8388 contents
 | 2026-11-21T10:45:00+08:00 | Codex / user | 将音频默认值写入 Armbian 构建树 | 新增 `really-audio-route.service` 和脚本；WirePlumber 同时提升 `priority.driver/session` | 源码改动完成，待下一次完整镜像验收 | 构建并检查镜像内服务、默认 sink 与冷启动录音 |
 | 2026-11-21T10:48:00+08:00 | Codex / user | 做 PDM 持续采集回归 | 8 秒 `pw-record` 仅写 26624 帧（约 0.55 秒）后 `hw_ptr` 停住，ALSA 状态仍为 `RUNNING`；直接 `arecord hw:0,0` 返回 `pcm_read: Input/output error`；8/16/48 kHz 均只得到约 0.25 秒数据 | PDM 尚未闭环；厂家驱动在 clock enable 后等待约 20 ms，并在 RX 启动后等待约 20 ms filter，mainline 当前均无该时序 | 增加最小 PDM 时序补丁并做长时采集 |
 | 2026-11-21T11:10:00+08:00 | Codex / user | 编译并实机验证 PDM clock/filter delay 补丁 | 运行中 `mclk_pdm0=300 MHz`、PDM `CTRL0/CTRL1/CLK_CTRL` 持续有效；12 秒 `pw-record` 写入 38912 帧（约 0.81 秒），`nonzero=923`、`RMS=740`、`peak=32316`，之后 `hw_ptr` 停住；裸 `hw:0,0` 仍报 I/O error | **延迟补丁不足，不能保留**；当前证据更指向 PDM 数据/DMA 通路或板级 DMIC 供电，而非单纯启动等待 | 撤回补丁；后续对比原厂 Android 运行态、PDM 供电和 DMA 请求 |
+| 2026-11-22T10:15:00+08:00 | Codex / user | 根据 TF 卡启动听感偏低调整 ES8388 默认并重建完整镜像 | 扬声器 `Output 2` 从 `27 (-3 dB)` 提到 `33 (+3 dB)`，`PCM` 从 `189 (-1.5 dB)` 提到 `192 (0 dB)`；耳机 `Output 1` 保持 `27`；参数写入 `/etc/default/really-audio` 并核验进入镜像 | **调整已固化，尚未完成新镜像实机听感确认** | 刷入新 Really edge 镜像，用普通音量、用户控制音频测试响度和失真；若仍偏小再评估软件增益或硬件链路 |
 |  |  |  |  |  |  |
 
 建议每次追加记录以下固定字段：

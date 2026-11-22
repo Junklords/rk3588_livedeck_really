@@ -305,6 +305,24 @@ RK3588 内部 DW watchdog `watchdog@feaf0000` 也按原厂状态在三套 DTS �
 
 ## DTS 状态策略
 
+## 用户态桌面与首次登录基线（2026-11-22）
+
+本轮 TF 启动验证后的用户态默认值已固化到 Armbian 构建仓：
+
+```text
+首次登录：REALLY_FIRST_LOGIN_MODE=cli（默认）或 gui
+终端：仅 GNOME Terminal；移除 Ubuntu Ptyxis
+Dock：Chrome、Files、Terminal、Settings、mpv、Software
+视频默认：mpv.desktop（MP4/MKV/WebM/AVI/QuickTime/MPEG 等）
+ES8388：耳机 Output 1=27，扬声器 Output 2=33，PCM=192
+```
+
+首次登录默认保持在 `multi-user.target` 的 tty1 文本流程；
+`armbian-firstrun-gui.service` 和 `gnome-initial-setup-first-login.service`
+都保持 mask。只有显式使用 `REALLY_FIRST_LOGIN_MODE=gui` 才启用 Slint GUI。
+扬声器参数可在镜像内 `/etc/default/really-audio` 调整，`33/192` 仍保留
+相对满档的运行余量。
+
 工厂 FDT 中明确启用的启动相关节点包括：
 
 - RK806 PMIC、RK8602/RK8603 CPU 供电和 RK8602 NPU 供电；
