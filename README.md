@@ -232,9 +232,10 @@ LT6911UXC2 只存在于机身内部的隐藏接口。Android 下自写
 ```text
 eMMC 5.1      --> mmc0
 SD card       --> mmc1
-PCIe lane 1   --> combphy2_psu
+M.2 B-key     --> sata2 / combphy2_psu (NGFF SATA)
 PCIe lane 2   --> combphy0_ps
 combphy1_ps   --> disabled
+PCIe lane 1   --> disabled
 SATA0 / PCIe3 --> disabled
 ```
 
@@ -260,7 +261,7 @@ SATA0 / PCIe3 --> disabled
 | LT6911 HPD control | GPIO2_C3 | High | LT6911UXC2 `hpd-ctl-gpios` |
 | LT6911 interrupt | GPIO1_C7 | Low | LT6911UXC2 interrupt |
 | PCIe lane 2 reset | GPIO3_B7 | High | AP6275P `pcie2x1l2` |
-| PCIe lane 1 reset | GPIO1_A7 | High | `pcie2x1l1` |
+| M.2 power enable | GPIO3_B3 | High | `vcc3v3_m2` |
 | SD 卡电源 | GPIO4_C3 | High | `vcc_sd` |
 | Type-C VBUS enable | GPIO1_D1 | High | HUSB311 source-role VBUS control |
 | USB-A host 5 V enable | GPIO3_A5 | High | `vcc5v0_host` |
