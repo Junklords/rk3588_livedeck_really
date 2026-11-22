@@ -1,9 +1,9 @@
 From: Really Board Support <build@really.local>
 Date: Sun, 15 Nov 2026 11:30:00 +0800
-Subject: [PATCH] rockchip: really: prefer USB before eMMC
+Subject: [PATCH] rockchip: really: boot USB, TF, M.2 SATA, then eMMC
 
-Keep the removable microSD card first, then try bootable USB media, and use
-the onboard eMMC as the final local fallback.
+Boot removable USB first, then the removable microSD card, then the M.2
+SATA disk, and finally the onboard eMMC.
 
 ---
 
@@ -11,6 +11,6 @@ diff --git a/arch/arm/mach-rockchip/board.c b/arch/arm/mach-rockchip/board.c
 --- a/arch/arm/mach-rockchip/board.c
 +++ b/arch/arm/mach-rockchip/board.c
 @@ -325,0 +326 @@ int board_late_init(void)
-+	env_set("boot_targets", "mmc1 usb mmc0");
++	env_set("boot_targets", "usb mmc1 scsi mmc0");
 --
 2.43.0

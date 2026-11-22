@@ -4,7 +4,7 @@ Date: Sun, 15 Nov 2026 16:45:00 +0800
 Subject: [PATCH] rockchip: really: act on reboot-mode storage and loader modes
 
 Really writes a Rockchip boot mode to PMU0_GRF 0x80 before reboot. Handle
-SD/eMMC/USB as boot_targets preferences, stop in the shell for recovery, and
+SD/SATA/eMMC/USB as boot_targets preferences, stop in the shell for recovery, and
 return to BootROM download mode for "reboot loader" so rkdeveloptool can
 flash the board without physical maskrom.
 
@@ -52,7 +52,7 @@ diff --git a/arch/arm/mach-rockchip/boot_mode.c b/arch/arm/mach-rockchip/boot_mo
 +	const char *p;
 +
 +	if (!order)
-+		order = "mmc1 usb mmc0";
++		order = "usb mmc1 scsi mmc0";
 +
 +	len = snprintf(out, sizeof(out), "%s", target);
 +	for (p = order; *p && len < sizeof(out) - 1; ) {

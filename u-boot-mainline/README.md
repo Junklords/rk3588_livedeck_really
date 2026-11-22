@@ -108,8 +108,8 @@ always worked here and TF has not. See
 
 `u-boot,spl-boot-order` mirrors the proven Skysi-X5 structure:
 `same-as-spl`, then `&sdmmc`, then `&sdhci`. U-Boot proper uses the normal
-`boot_targets` mechanism after SPL. No board-specific `preboot` loader is part
-of the final configuration.
+`boot_targets` mechanism after SPL: USB -> TF -> M.2 SATA -> eMMC. No
+board-specific `preboot` loader is part of the final configuration.
 
 See [TF-BOOT-STATUS.md](TF-BOOT-STATUS.md) for the final cold-boot evidence.
 TF boot is closed.

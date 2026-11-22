@@ -17,7 +17,7 @@ depending on the build workstation.
 | Patch | Status | Purpose |
 |---|---|---|
 | `0001-really-persistent-boot-log.patch` | diagnostic | Persist selected SPL/U-Boot markers to eMMC sectors. Not a community-ready feature. |
-| `0002-really-prefer-usb-before-emmc.patch` | build policy | Set `boot_targets` to `mmc1 usb mmc0`. |
+| `0002-really-prefer-sata-before-emmc.patch` | build policy | Set `boot_targets` to `usb mmc1 scsi mmc0`. |
 | `0003-really-act-on-reboot-mode.patch` | partially validated | `reboot loader` is verified; storage-specific targets map SD/eMMC/USB/NVMe and recovery to U-Boot shell. |
 | `0004-really-sdmmc-power-domain-in-spl.patch` | experimental / ineffective | Direct PMU write for `PD_SDMMC`. Tested and did not power the TF controller. Do not treat as the fix. |
 

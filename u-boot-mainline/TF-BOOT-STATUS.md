@@ -34,16 +34,16 @@ back to eMMC.
 ## Final boot policy
 
 ```text
-TF microSD -> USB -> eMMC
+USB -> TF microSD -> M.2 SATA -> eMMC
 ```
 
 `u-boot,spl-boot-order` remains:
 
 ```dts
-u-boot,spl-boot-order = "same-as-spl", &sdmmc, &sdhci;
+u-boot,spl-boot-order = &sdmmc, &sdhci;
 ```
 
-U-Boot proper sets `boot_targets` to `mmc1 usb mmc0`.
+U-Boot proper sets `boot_targets` to `usb mmc1 scsi mmc0`.
 
 ## SD power chain
 

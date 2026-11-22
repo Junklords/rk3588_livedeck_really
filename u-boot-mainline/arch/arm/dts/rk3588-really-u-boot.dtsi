@@ -5,11 +5,56 @@
 / {
 	chosen {
 		/*
-		 * Match the proven Skysi X5 chain: keep the U-Boot proper
-		 * belonging to the current SPL first, then fall back to SD and
-		 * eMMC.  U-Boot proper scans boot_targets (SD -> USB -> eMMC)
-		 * after this point.
+		 * SPL does not get to choose: it walks this list in order and
+		 * stops at the first entry that yields a loadable U-Boot proper
+		 * (common/spl/spl.c: boot_from_devices() returns 0 on the first
+		 * success, it never compares candidates).
+		 *
+		 * "same-as-spl" would resolve to the medium the BootROM loaded
+		 * the SPL from.  On this board the BootROM tries eMMC before SD,
+		 * so when an Armbian U-Boot lives on the eMMC, same-as-spl
+		 * resolves to the eMMC, the eMMC's U-Boot proper at 0x4000 is
+		 * read successfully, and the SD card is never even attempted --
+		 * an Android image on SD then cannot boot.  Hence the SD card is
+		 * pinned first, unconditionally, and the eMMC only serves as the
+		 * fallback when no card is inserted.
+		 *
+		 * Consequence: with a card inserted the board always boots the
+		 * card, even if the eMMC holds a working system.  That is the
+		 * intended rescue/dual-boot behaviour, matching what the SD
+		 * Armbian flow already relied on.
+		 *
+		 * U-Boot proper then scans boot_targets
+		 * (usb -> mmc1 -> scsi -> mmc0), see
+		 * board_really/0002-really-prefer-sata-before-emmc.patch.
 		 */
-		u-boot,spl-boot-order = "same-as-spl", &sdmmc, &sdhci;
+		u-boot,spl-boot-order = &sdmmc, &sdhci;
 	};
+};
+
+/*
+ * Keep the M.2 slot powered while U-Boot scans its SATA disk.  Linux takes
+ * over the same GPIO through vcc3v3_m2 after the handoff.
+ */
+&gpio3 {
+	m2-pwr-en-hog {
+		gpio-hog;
+		gpios = <11 0>;
+		output-high;
+		line-name = "m2_pwr_en";
+	};
+};
+
+&combphy2_psu {
+	status = "okay";
+};
+
+&sata2 {
+	status = "okay";
+	phys = <&combphy2_psu PHY_TYPE_SATA>;
+	phy-names = "sata-phy";
+};
+
+&pcie2x1l1 {
+	status = "disabled";
 };
