@@ -40,7 +40,7 @@ SHA256: D516E8F62CE040E76CAB2CBC394DBE46AB53F3F82E9CEC1ED8E5714F51358521
 | Memory | LPDDR4 topology in the factory DTS |
 | Primary storage | 8-bit eMMC 5.1, HS400, non-removable |
 | SD | 4-bit SDMMC, UHS SDR104, switchable 3.3 V supply |
-| Internal panel | 15.6-inch portrait; DSI1 4-lane -> LT9211 -> dual-link odd/even 24-bit VESA LVDS. The controller scans 1920x1080@60 and the desktop rotates it to a 1080x1920 logical display |
+| Internal panel | 15.6-inch portrait; DSI1 4-lane -> LT9211 -> dual-link odd/even 24-bit VESA LVDS. The native mode is 1920x1080@48 (118.8 MHz), with optional 1920x1080@60 (148.5 MHz) |
 | Alternate internal panel | eDP0 is a physical optional route; its full VP2/eDP0/AUX topology is retained but disabled because this assembly has no eDP panel |
 | External display | HDMI1 and DP0 over USB-C Alt Mode; the final DP0 baseline is not closed |
 | Ethernet | GMAC0, RGMII, PHY address 1 |
@@ -276,7 +276,11 @@ its existing disabled-eDP baseline until that model is validated.
    link crops the desktop to half width and corrupts the pixel clock.
    The vendor mode-3 channel-enable value (`0x855c = 0x07`) is applied by
    the board kernel patch to remove residual pixel-column jitter.
-5. Type-C DP is not closed. A previous two-lane configuration produced
+5. Some LT9211 assemblies cannot maintain 60 Hz and report intermittent PCR
+   unlock with short black flashes. The current native mode is 48 Hz; 60 Hz
+   remains selectable for stable units. See
+   `reports/lt9211-refresh-modes-20261123/README.en.md`.
+6. Type-C DP is not closed. A previous two-lane configuration produced
    4K30, but the final baseline repeatedly loses the Type-C partner and
    leaves `DP-1` disconnected.
-6. The device tree describes kernel hardware only. Booting also requires a matching loader, U-Boot, memory initialization and root filesystem.
+7. The device tree describes kernel hardware only. Booting also requires a matching loader, U-Boot, memory initialization and root filesystem.

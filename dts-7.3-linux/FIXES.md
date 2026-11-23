@@ -162,8 +162,11 @@ release suffix.
 - LT9211 port 2 carries odd pixels and port 3 carries even pixels. The
   panel sink exposes the matching `dual-lvds-odd-pixels` and
   `dual-lvds-even-pixels` properties.
-- The LT9211/DSI controller scans 1920x1080@60 at 148.5 MHz; the physical
-  15.6-inch panel is mounted portrait.  The panel node declares
+- The LT9211/DSI controller defaults to 1920x1080@48 at 118.8 MHz. The
+  optional 60 Hz mode remains exposed at 148.5 MHz for stable assemblies.
+  The native 48 Hz mode avoids intermittent PCR lock loss seen on some
+  LT9211 paths at 60 Hz. The physical 15.6-inch panel is mounted portrait.
+  The panel node declares
   `rotation = <270>` so DRM reports the correct portrait orientation and
   Mutter presents a 1080x1920 logical desktop.
 - The early kernel console does not consume panel orientation, so board
