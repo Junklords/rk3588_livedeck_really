@@ -1880,6 +1880,18 @@
 	status = "okay";
 };
 
+/*
+ * RK3588 rkvdec IOMMUs do not pass the raw-reset DTE read-back test.
+ * Skip only that self-test so paging can be enabled.
+ */
+&vdec0_mmu {
+	rockchip,disable-mmu-reset;
+};
+
+&vdec1_mmu {
+	rockchip,disable-mmu-reset;
+};
+
 &vicap {
 	status = "okay";
 };
