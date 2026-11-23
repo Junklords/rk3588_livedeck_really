@@ -172,11 +172,12 @@
 
 		display-timings {
 			/*
-			 * The community LT9211 path is not stable at 60 Hz on
-			 * affected assemblies. Select the conservative 48 Hz
-			 * mode by default while keeping 60 Hz selectable.
+			 * Most panels, including the validated 15.6-inch assembly,
+			 * are stable at 60 Hz and must use it as the preferred mode.
+			 * Keep 48 Hz available as a runtime fallback for batches
+			 * whose LT9211 link cannot sustain 60 Hz.
 			 */
-			native-mode = <&panel_timing_48>;
+			native-mode = <&panel_timing_60>;
 
 			panel_timing_48: timing48 {
 				clock-frequency = <118800000>;

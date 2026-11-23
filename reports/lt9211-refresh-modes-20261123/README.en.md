@@ -7,7 +7,8 @@
 - Context: Some Really assemblies lose LT9211 lock and flash at 1920x1080@60.
 - Branch: Armbian `edge`, Linux 7.3.
 - Test environment: Really TVI2340R, DSI1, LT9211, dual-link VESA-24 LVDS.
-- Default policy: 48 Hz is native/preferred; 60 Hz remains selectable.
+- Default policy: 60 Hz is native/preferred; 48 Hz remains a compatibility
+  fallback.
 
 ## Timing parameters
 
@@ -28,7 +29,7 @@ vtotal = 1125
 The board DTS uses the standard `display-timings` node:
 
 ```text
-native-mode = <&panel_timing_48>;
+native-mode = <&panel_timing_60>;
 timing48 -> 118800000
 timing60 -> 148500000
 ```
@@ -40,7 +41,10 @@ timing as preferred. Existing single-timing panels keep their old behavior.
 
 ## Automatic fallback boundary
 
-The current automatic behavior selects the stable 48 Hz mode by default.
+The system selects the validated stable 60 Hz mode by default. Units that
+cannot sustain 60 Hz may select 48 Hz manually. Making 48 Hz the default is not
+safe because otherwise functional LVDS panels may reject that refresh rate and
+stay black during cold boot.
 
 Live fallback from an unstable running 60 Hz mode is not implemented. LT9211
 does not currently report a runtime lock-loss event back to DRM, and changing
@@ -58,8 +62,8 @@ Test one variable at a time:
 3. Test DSI EoT, non-burst and continuous/non-continuous clock-lane modes.
 4. Tune LT9211 RX PHY calibration and compare DSI PHY drive/termination.
 5. Measure LT9211 `vccio`, 1.8 V and PHY analog power sequencing.
-6. Restore 60 Hz as preferred only after cold boot, reboot and sustained-run
-   validation.
+6. Keep 60 Hz as the default preferred mode; use 48 Hz only as a fallback for
+   affected hardware batches.
 
 Increasing the PCR poll timeout is not a fix. The observed failure is repeated
 lock loss after initial operation.
@@ -69,6 +73,8 @@ lock loss after initial operation.
 - The multi-timing patch passes `git apply --check`.
 - `panel-lvds.o` builds with the Armbian 7.3 kernel configuration.
 - The Really DTS preprocesses and produces a DTB.
-- Decompilation confirms `timing48` is native and `timing60` remains present.
+- Decompilation confirms `timing60` is native and `timing48` remains present.
+- Hardware validation: an otherwise stable 60 Hz LVDS panel stayed black with
+  48 Hz preferred. Restoring 60 Hz as preferred recovered the display.
 - Only the existing PCIe duplicate-address and VOP graph-address warnings
   remain.

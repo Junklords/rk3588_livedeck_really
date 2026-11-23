@@ -7,7 +7,7 @@
 - 背景：部分 Really 装配的 LT9211 在 1920×1080@60 下间歇失锁并闪屏。
 - 适用分支：Armbian `edge`，Linux 7.3。
 - 验证环境：Really TVI2340R、DSI1、LT9211、双通道 VESA-24 LVDS。
-- 默认策略：48 Hz 为 native/preferred，60 Hz 保留为可选模式。
+- 默认策略：60 Hz 为 native/preferred，48 Hz 保留为兼容回退模式。
 
 ## 模式参数
 
@@ -28,7 +28,7 @@ vtotal = 1125
 板级 DTS 使用标准 `display-timings`：
 
 ```text
-native-mode = <&panel_timing_48>;
+native-mode = <&panel_timing_60>;
 timing48 -> 118800000
 timing60 -> 148500000
 ```
@@ -45,7 +45,9 @@ general-drm-panel-lvds-support-multiple-timings.patch
 
 ## 自动回落边界
 
-当前自动回落是指系统默认选择稳定的 48 Hz，不会把 60 Hz 作为首选。
+系统默认选择已验证稳定的 60 Hz；无法稳定运行 60 Hz 的批次可手动选择
+48 Hz。默认值不能固定为 48 Hz，因为部分完全正常的 LVDS 屏不接受该
+刷新率，会在冷启动阶段直接黑屏。
 
 尚未实现的是：系统正在运行 60 Hz，LT9211 中途 PCR 失锁后自动重配 CRTC
 并切到 48 Hz。LT9211 的 `atomic_enable` 当前没有向 DRM 返回运行时锁失
@@ -62,7 +64,7 @@ connector 恢复、mode change 和失败次数门限。
 3. 验证 DSI EoT、非 burst 和连续/非连续 clock lane 组合。
 4. 调整 LT9211 RX PHY 校准值，并对比 DSI PHY drive/termination。
 5. 测量 LT9211 `vccio`、1.8 V 和 PHY 模拟电源的上电顺序。
-6. 只在冷启动、热重启和持续运行都通过后，才恢复 60 Hz 为 preferred。
+6. 60 Hz 必须保持为默认 preferred；48 Hz 仅用于异常批次回退。
 
 不应把 PCR poll 超时简单加长当作修复；当前问题是运行中反复掉锁。
 
@@ -71,6 +73,8 @@ connector 恢复、mode change 和失败次数门限。
 - 多 timing 补丁 `git apply --check` 通过。
 - `panel-lvds.o` 使用 Armbian 7.3 内核配置编译通过。
 - Really DTS 预处理和 DTB 编译通过。
-- 反编译确认 `timing48` 为 native，`timing60` 保留。
+- 反编译确认 `timing60` 为 native，`timing48` 保留。
+- 实机验证：默认 48 Hz 会在 60 Hz LVDS 屏上黑屏；改回 60 Hz preferred
+  后屏幕恢复。
 - DTB 编译只有既有的 PCIe 重复 unit-address 和 VOP graph unit-address
   warning。
