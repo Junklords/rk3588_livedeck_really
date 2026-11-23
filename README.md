@@ -131,14 +131,19 @@ LT9211（`0x2d`）一直正常，是因为它挂在常开的 `vcc_1v8_s3` 上，
 - `really-phy-leds` 常驻 service
 
 USB 键盘接收器与其 GL3523 USB2 hub 改由窄匹配 udev 规则永久关闭
-runtime autosuspend；PHY LED 的 `netdev` trigger 和 `end0` 关联来自
-主设备树，udev 只设置 YT8531 的链路/活动硬件规则。
+runtime autosuspend。YT8531 PHY LED 由一次性 udev 规则先绑定
+`trigger=netdev` 和 `device_name=end0`，再设置链路/活动条件。驱动只在
+选中 `netdev` trigger 后创建 `link_1000`、`full_duplex`、`rx`、`tx`
+属性；旧规则跳过前两步，因此这些写入会被拒绝。
 
 GPIO1_D0 实际上是触摸/面板共用使能，不是 eDP 专属信号。当前 DTS 用
 独立常开的 `touch_panel_pwr` regulator 保持原厂上电状态，因此无论
 LVDS 装配还是未来 eDP 装配都适用。当前机型没有 eDP 面板，eDP0、
 VP2 endpoint、eDP in/out endpoint 和 AUX panel 均保留但默认
 `disabled`，避免瞬时 HPD 误判给 fbcon 注入 1024×768 fallback。
+
+2026-11-23 已在 Really 实机验证新的 LED 规则：两个 PHY LED 均绑定
+`end0`，绿灯配置为 1 Gbps 全双工链路，黄灯配置为 RX/TX 活动。
 
 触控方向不能只照搬原厂 DTB。原厂方向逻辑在 GT9xx 驱动中，而主线由
 `touchscreen-inverted-x`、`touchscreen-inverted-y`、

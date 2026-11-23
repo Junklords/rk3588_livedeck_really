@@ -81,8 +81,14 @@ were hardware-validated on 2026-11-16.
 The old touch, RTC and Wi-Fi late services have been removed from the image.
 U-Boot raises only the switched GPIO0_C0 rail through a board-DTS GPIO hog.
 Mainline probing now binds GT9110, HYM8563, LT9211 and AP6275P without a
-userspace rebind. The USB receiver/hub runtime-suspend policy and YT8531 LED
-hardware rules are handled by narrow one-shot udev rules.
+userspace rebind. The USB receiver/hub runtime-suspend policy is handled by a
+narrow one-shot udev rule. The YT8531 rule first selects the `netdev` trigger
+and binds `end0`; this creates the `link_1000`, `full_duplex`, `rx` and `tx`
+attributes before the rule configures them.
+
+The corrected LED rule was validated on Really hardware on 2026-11-23. Both
+PHY LEDs bind to `end0`; green shows a 1 Gbps full-duplex link and yellow shows
+RX/TX activity.
 
 See
 [`reports/workaround-audit-20261116/README.md`](reports/workaround-audit-20261116/README.md)
