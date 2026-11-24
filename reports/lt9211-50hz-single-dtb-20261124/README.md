@@ -40,3 +40,16 @@
 - rootfs 无 `71-really-phy-led.rules`
 - initrd 无 `71-really-phy-led.rules`
 - PHY LED 由 `end0` 就绪后的 systemd oneshot 配置
+
+## 交付验证
+
+- Armbian 构建仓提交：`81a85af76`
+- Device 仓提交：`990b325`
+- 发布镜像 SHA256：
+  `51c8d9b62ddd2aa7f6556192894f034bcf745d11c0ffe3b9eca5f228b2a1fd5c`
+- 分享 ZIP SHA256：
+  `ed20c1c04b80402f791fa980d91c5f479cb0638a7e083e559ba35e3cd295b78a`
+
+已刷入 Really eMMC 并实机验证：默认 50Hz、LVDS connected/On、
+`dclk_vop3=132MHz`、旧 PHY LED udev 规则不在 rootfs/initrd、
+`really-phy-led.service` 为 enabled/active，系统无 failed units。

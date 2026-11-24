@@ -41,3 +41,17 @@ been removed from rootfs. Armbian's initrd cache key now includes
 `/etc/udev` and `/usr/lib/udev/rules.d`. The final image contains no PHY LED
 rule in either rootfs or initrd; LEDs are configured by a systemd oneshot
 after `end0` exists.
+
+## Release verification
+
+- Armbian build repository commit: `81a85af76`
+- Device repository commit: `990b325`
+- Image SHA256:
+  `51c8d9b62ddd2aa7f6556192894f034bcf745d11c0ffe3b9eca5f228b2a1fd5c`
+- Share ZIP SHA256:
+  `ed20c1c04b80402f791fa980d91c5f479cb0638a7e083e559ba35e3cd295b78a`
+
+The image was written to Really eMMC and validated: the default is 50 Hz,
+LVDS is connected and DPMS is On, `dclk_vop3=132MHz`, the old PHY LED udev
+rule is absent from rootfs and initrd, `really-phy-led.service` is
+enabled/active, and no systemd units failed.
