@@ -26,3 +26,24 @@
 ## Android 侧最终确认（root adb）
 - 193s 内核日志：signal lock ok / 音频 44.1k / VOP 1080p60 转发 OUT
 - HDMI-in 硬件与 OEM 全链路无恙 ✓
+
+## 2026-11-23 补充: Junklords 仓库对照 + PD_VO1 修正
+
+### Junklords/rk3588_livedeck_really 对照结论
+- 其 Android 侧分析与本报告一致(面板口=内部RX@fdee0000, LT6911=内部隐藏P2路,
+  原厂 DT status=okay, Android 全链路可用含 1080p NV12 抓帧)
+- **其主线侧 P0 从未闭环**: 11-16 的排查在错误的机器上(Skysi X5, 其 DT 该节点
+  本来 disabled), 报告结尾"需在真 Really 复验"后再未涉及 HDMI-in
+- 有用洞见: mainline snps_hdmirx 不调 SMC(不需要 ATF); 引脚与原厂逐根一致
+
+### PD_VO1 修正(已入 DTB, 未解锁锁定)
+- live DT power-domains = <phandle 26> = PD_VO1(两树编号同: 26)
+- 原移植误设 PD_VI(27) → 已改 PD_VO1 并重刷 DTB
+- 结果: 锁定仍未通(mu_st=0), PD 非唯一根因
+
+### 下一步(优先级序)
+1. **双系统锁态寄存器对比**: Android(可写入 hdmirx 全寄存器 dump 工具) vs 主线,
+   差异寄存器 = 缺失的初始化步骤(重点: PHY clock 输出到 MU 的路由位)
+2. BL31 能力: Android trust v2.3 vs 我们的 rkbin v1.48 — sip_hdmirx_config
+  (AUTO_TOUCH/REG_PRE_FETCH)在 v1.48 是否实现, 缺失则换 Android 的 trust.img 到主线链
+3. 主线 snps_hdmirx(非 vendor 移植版)在标准资源下按 Junklords 思路再试一次
