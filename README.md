@@ -67,7 +67,7 @@ SHA256: D516E8F62CE040E76CAB2CBC394DBE46AB53F3F82E9CEC1ED8E5714F51358521
 | 内存 | 工厂 DTS 标示为 LPDDR4 拓扑 |
 | 主存储 | 8 bit eMMC 5.1，HS400，不可移除 |
 | SD 卡 | 4 bit SDMMC，UHS SDR104，独立 3.3 V 供电控制 |
-| 内屏 | 15.6 吋竖屏；DSI1 4-lane → LT9211 → 双通道 odd/even 24 bit VESA LVDS。默认扫描 1920×1080@48（118.8 MHz），保留 1920×1080@60（148.5 MHz）可选 |
+| 内屏 | 15.6 吋竖屏；DSI1 4-lane → LT9211 → 双通道 odd/even 24 bit VESA LVDS。单一 DTB 默认 1920×1080@50（132 MHz），同时提供 1920×1080@60（148.5 MHz）供 GNOME 设置选择 |
 | 备用内屏 | eDP0 是板级物理接口和可选内屏装配路径；同一 DTS 保留 VP2/eDP0/AUX panel 拓扑，但默认将控制器与整条 route 标为 disabled |
 | 外部显示 | HDMI1；DP0（USB-C DP Alt Mode）采用 HBR2 + 8bpc。扩展坞使用 two-lane DP，4K30；直连显示器会按 pin assignment 动态切到 four-lane DP，4K60 RGB 已验证 |
 | 有线网络 | GMAC0，RGMII，PHY 地址 1 |
@@ -93,7 +93,7 @@ SHA256: D516E8F62CE040E76CAB2CBC394DBE46AB53F3F82E9CEC1ED8E5714F51358521
 | 功能 | 当前状态 |
 | --- | --- |
 | LVDS 内屏 | `LVDS-1 connected`，双链路画面正常 |
-| LVDS 刷新率 | 默认 48 Hz；60 Hz 保留给稳定批次手动选择 |
+| LVDS 刷新率 | 默认 50 Hz；60 Hz 作为同一 DTB 内的可选 DRM mode，在 GNOME 显示器设置中切换 |
 | HDMI OUT | 当前未接显示器，`HDMI-A-1 disconnected` |
 | USB-C DP | ✅ **基线可用**。DP0→VP0，HBR2（5.4 Gbps/lane），RGB444 8bpc；扩展坞 two-lane 4K30 正常，直连 four-lane 4K60 正常。four-lane 模式下 USB3 不可同时使用 |
 | GT9110 触控 | ✅ **已工作**。`ID 9110`；随 270° 面板方向使用 `inverted-x + swapped-x-y`，九点映射验证通过 |
@@ -132,10 +132,9 @@ LT9211（`0x2d`）一直正常，是因为它挂在常开的 `vcc_1v8_s3` 上，
 - `really-phy-leds` 常驻 service
 
 USB 键盘接收器与其 GL3523 USB2 hub 改由窄匹配 udev 规则永久关闭
-runtime autosuspend。YT8531 PHY LED 由一次性 udev 规则先绑定
-`trigger=netdev` 和 `device_name=end0`，再设置链路/活动条件。驱动只在
-选中 `netdev` trigger 后创建 `link_1000`、`full_duplex`、`rx`、`tx`
-属性；旧规则跳过前两步，因此这些写入会被拒绝。
+runtime autosuspend。YT8531 PHY LED 改由 `end0` 就绪后的 systemd
+oneshot 绑定 `trigger=netdev` 和 `device_name=end0`，再设置链路/活动
+条件；PHY LED 不再通过 initramfs 中的 udev 规则配置。
 
 GPIO1_D0 实际上是触摸/面板共用使能，不是 eDP 专属信号。当前 DTS 用
 独立常开的 `touch_panel_pwr` regulator 保持原厂上电状态，因此无论
@@ -143,7 +142,7 @@ LVDS 装配还是未来 eDP 装配都适用。当前机型没有 eDP 面板，eD
 VP2 endpoint、eDP in/out endpoint 和 AUX panel 均保留但默认
 `disabled`，避免瞬时 HPD 误判给 fbcon 注入 1024×768 fallback。
 
-2026-11-23 已在 Really 实机验证新的 LED 规则：两个 PHY LED 均绑定
+2026-11-24 已在 Really 实机验证新的 LED 服务：两个 PHY LED 均绑定
 `end0`，绿灯配置为 1 Gbps 全双工链路，黄灯配置为 RX/TX 活动。
 
 触控方向不能只照搬原厂 DTB。原厂方向逻辑在 GT9xx 驱动中，而主线由
@@ -390,9 +389,10 @@ VP2、PWM6 背光和 AUX panel 描述，但默认全部 disabled；启用实际 
    panel 状态；面板应提供 EDID，无 EDID 时必须补准确时序。
 4. 内屏是双通道 VESA-24 LVDS。只配一条 LVDS link 会把桌面裁成半幅并使像素时基错乱；原厂 mode 3 的 `0x855c = 0x07` 通道使能已由板级内核补丁补齐。
 5. LT9211 在部分装配上无法稳定维持 60 Hz，表现为运行中 PCR 失锁和短黑闪。
-   当前将 48 Hz 设为 native/preferred 自动模式，同时保留 60 Hz。
-   多模式实现和 60 Hz 稳定化实验见
-   `reports/lt9211-refresh-modes-20261123/README.md`。
+   最终版使用单一 DTB：50 Hz（132 MHz）为 preferred，60 Hz（148.5 MHz）
+   同时注册为标准 DRM mode，可在 GNOME 显示器设置中切换。48 Hz 方案已删除。
+   最终验证记录见
+   `reports/lt9211-50hz-single-dtb-20261124/README.md`。
 6. Type-C DP 基线已闭环：HBR3 虽能完成训练但其视频流异常，因此当前把
    链路速率限制为 HBR2，并强制 RGB444 8bpc；DP0 使用 VP0，HDMI1 使用
    VP1。扩展坞按 two-lane 运行并验证 4K30；直连显示器按 Type-C pin

@@ -1,5 +1,9 @@
 # Really LT9211 48/60 Hz 模式与稳定化记录
 
+> 2026-11-24 更新：本报告记录当时的 48/60Hz 实验，已被单 DTB 50/60Hz
+> 最终方案取代。48Hz 已删除，参见
+> `../lt9211-50hz-single-dtb-20261124/README.md`。
+
 [English version](README.en.md)
 
 - 作者：Codex（AI 助手）

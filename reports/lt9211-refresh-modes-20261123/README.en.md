@@ -1,5 +1,9 @@
 # Really LT9211 48/60 Hz Modes and Stabilization
 
+> Updated 2026-11-24: this document records the earlier 48/60 Hz experiment.
+> It is superseded by the final single-DTB 50/60 Hz design. The 48 Hz profile
+> has been removed; see `../lt9211-50hz-single-dtb-20261124/README.en.md`.
+
 [中文说明](README.md)
 
 - Author: Codex (AI assistant)

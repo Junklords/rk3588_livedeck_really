@@ -40,7 +40,7 @@ SHA256: D516E8F62CE040E76CAB2CBC394DBE46AB53F3F82E9CEC1ED8E5714F51358521
 | Memory | LPDDR4 topology in the factory DTS |
 | Primary storage | 8-bit eMMC 5.1, HS400, non-removable |
 | SD | 4-bit SDMMC, UHS SDR104, switchable 3.3 V supply |
-| Internal panel | 15.6-inch portrait; DSI1 4-lane -> LT9211 -> dual-link odd/even 24-bit VESA LVDS. The native mode is 1920x1080@48 (118.8 MHz), with optional 1920x1080@60 (148.5 MHz) |
+| Internal panel | 15.6-inch portrait; DSI1 4-lane -> LT9211 -> dual-link odd/even 24-bit VESA LVDS. One DTB defaults to 1920x1080@50 (132 MHz) and exposes 1920x1080@60 (148.5 MHz) through GNOME Settings |
 | Alternate internal panel | eDP0 is a physical optional route; its full VP2/eDP0/AUX topology is retained but disabled because this assembly has no eDP panel |
 | External display | HDMI1 and DP0 over USB-C Alt Mode; the final DP0 baseline is not closed |
 | Ethernet | GMAC0, RGMII, PHY address 1 |
@@ -82,11 +82,10 @@ The old touch, RTC and Wi-Fi late services have been removed from the image.
 U-Boot raises only the switched GPIO0_C0 rail through a board-DTS GPIO hog.
 Mainline probing now binds GT9110, HYM8563, LT9211 and AP6275P without a
 userspace rebind. The USB receiver/hub runtime-suspend policy is handled by a
-narrow one-shot udev rule. The YT8531 rule first selects the `netdev` trigger
-and binds `end0`; this creates the `link_1000`, `full_duplex`, `rx` and `tx`
-attributes before the rule configures them.
+narrow one-shot udev rule. A systemd oneshot configures the YT8531 LEDs after
+`end0` exists; no PHY LED rule is included in initramfs.
 
-The corrected LED rule was validated on Really hardware on 2026-11-23. Both
+The corrected LED service was validated on Really hardware on 2026-11-24. Both
 PHY LEDs bind to `end0`; green shows a 1 Gbps full-duplex link and yellow shows
 RX/TX activity.
 
@@ -277,9 +276,9 @@ its existing disabled-eDP baseline until that model is validated.
    The vendor mode-3 channel-enable value (`0x855c = 0x07`) is applied by
    the board kernel patch to remove residual pixel-column jitter.
 5. Some LT9211 assemblies cannot maintain 60 Hz and report intermittent PCR
-   unlock with short black flashes. The current native mode is 48 Hz; 60 Hz
-   remains selectable for stable units. See
-   `reports/lt9211-refresh-modes-20261123/README.en.md`.
+   unlock with short black flashes. The final single DTB prefers 50 Hz and
+   exposes 60 Hz as a standard selectable DRM mode. See
+   `reports/lt9211-50hz-single-dtb-20261124/README.en.md`.
 6. Type-C DP is not closed. A previous two-lane configuration produced
    4K30, but the final baseline repeatedly loses the Type-C partner and
    leaves `DP-1` disconnected.

@@ -172,15 +172,18 @@
 
 		display-timings {
 			/*
-			 * Most panels, including the validated 15.6-inch assembly,
-			 * are stable at 60 Hz and must use it as the preferred mode.
-			 * Keep 48 Hz available as a runtime fallback for batches
-			 * whose LT9211 link cannot sustain 60 Hz.
+			 * 50 Hz is the validated default for both known panel
+			 * batches.  60 Hz remains available as a normal DRM mode
+			 * and can be selected from GNOME Settings.
 			 */
-			native-mode = <&panel_timing_60>;
+			native-mode = <&panel_timing_50>;
 
-			panel_timing_48: timing48 {
-				clock-frequency = <118800000>;
+			/*
+			 * 132 MHz with 1200 total vertical lines gives an exact
+			 * 50 Hz while preserving the vendor horizontal blanking.
+			 */
+			panel_timing_50: timing50 {
+				clock-frequency = <132000000>;
 				hactive = <1920>;
 				vactive = <1080>;
 				hfront-porch = <88>;
@@ -188,7 +191,7 @@
 				hback-porch = <148>;
 				vfront-porch = <4>;
 				vsync-len = <5>;
-				vback-porch = <36>;
+				vback-porch = <111>;
 				hsync-active = <1>;
 				vsync-active = <1>;
 				de-active = <0>;

@@ -162,10 +162,11 @@ release suffix.
 - LT9211 port 2 carries odd pixels and port 3 carries even pixels. The
   panel sink exposes the matching `dual-lvds-odd-pixels` and
   `dual-lvds-even-pixels` properties.
-- The LT9211/DSI controller defaults to 1920x1080@48 at 118.8 MHz. The
-  optional 60 Hz mode remains exposed at 148.5 MHz for stable assemblies.
-  The native 48 Hz mode avoids intermittent PCR lock loss seen on some
-  LT9211 paths at 60 Hz. The physical 15.6-inch panel is mounted portrait.
+- The single board DTB defaults to 1920x1080@50 at 132 MHz. The 60 Hz mode
+  remains exposed at 148.5 MHz as a second DRM mode for stable assemblies.
+  50 Hz preserves vendor horizontal blanking and adds vertical blanking to
+  retain link margin without leaving the panel's accepted refresh range.
+  The physical 15.6-inch panel is mounted portrait.
   The panel node declares
   `rotation = <270>` so DRM reports the correct portrait orientation and
   Mutter presents a 1080x1920 logical desktop.
@@ -282,8 +283,9 @@ Root cause and verified fix:
 ### Ethernet, fans, keys and power
 
 - GMAC0 uses RGMII, PHY address 1, GPIO2_C4 reset and `tx_delay = 0x44`.
-- YT8531 PHY LEDs use the DTS-selected `ledtrig-netdev` trigger. A narrow
-  udev rule sets the hardware green-link and yellow-RX/TX rules.
+- YT8531 PHY LEDs use the DTS-selected `ledtrig-netdev` trigger. A late
+  systemd oneshot binds them after `end0` exists; no PHY LED rule is copied
+  into initramfs.
 - PWM2 drives the fan with a 40000 ns period (25 kHz) and inverted
   polarity.
 - SARADC channel 1 provides volume-up, volume-down, menu and back;
