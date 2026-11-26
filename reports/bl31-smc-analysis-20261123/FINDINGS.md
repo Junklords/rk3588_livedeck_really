@@ -35,3 +35,20 @@ vendor 驱动调它们时在主线链上无声失败。
 - movk 掩码: (w & 0xFFE00000) == 0x72A00000 且 imm16==0x8200
 - movz 掩码: (w & 0xFFE00000) == 0x52800000
 - SMC 指令: b'\x03\x00\x00\xd4'
+
+## 2026-11-26 终极结论（Collabora issue #1 实锤）
+- Collabora TF-A issue #1（closed, by Shreeya Patel/snps_hdmirx 作者）:
+  "Binary BL31 from Rockchip contains some unknown code to get HDMI-RX PHY access
+   working. With TF-A BL31, the HDMI-RX PHY doesn't work."
+- 开源 TF-A 无法驱动 HDMI-RX PHY（缺未公开代码）→ snps 驱动的
+  "open-source TF-A is required" 指的是带该代码的 Rockchip 二进制 BL31
+- 我们的实测完全吻合: rkbin v1.48/Collabora 下 snps probe 均报 PHY access 失败;
+  Android vendor BL31 v2.3 下一切正常
+
+## 主线 HDMI-in 的可行路线（修正后）
+**vendor U-Boot 链 + 主线内核混合引导（boot_a 混合镜像）**:
+BootROM → vendor gap loader → vendor BL31 v2.3（PHY 未公开代码在位）→
+vendor U-Boot → boot_a（内核换成主线 Image, DTB 换主线版, cmdline 保持
+vendor 传参格式）→ mainline snps_hdmirx 驱动直接可用
+- 工具: v1.1 ROM 包有 magiskboot/unpack_bootimg 工具链
+- 备份: boot_a.img 原版可随时写回
