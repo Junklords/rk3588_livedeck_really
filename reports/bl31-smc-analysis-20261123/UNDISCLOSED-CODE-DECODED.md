@@ -40,3 +40,29 @@ EL3: BL31 v2.3 (0x40000, 198KB)
 - phy-tables/phy-param-tables.bin — 提取的 4116B 参数表
 - atf1-vendor-v2.3.verified — 正确 carve 的 vendor BL31（头 69800094=bl 指令）
 - atf2-firmware.bin — FIQ 调试器固件
+
+## 2026-11-24 三启动完整正解（A/B 双 FIT 槽设计）
+
+### 发现的引导冲突
+- 社区 SPL(@gap64) 固定从 LBA 16384(uboot_a) 读 FIT → 与 vendor FIT 冲突
+- 社区 SPL + vendor BL31 的交接 = 挂死（实测两次）
+- vendor 链必须: vendor miniloader(gap) + vendor FIT(uboot_a) + vendor BL31
+
+### 正解：A/B 槽分工
+```
+uboot_a (LBA 16384) = vendor FIT 原样      ← Android 链（vendor miniloader 读取）
+uboot_b (LBA 24576) = 社区 FIT (v1.48+主线U-Boot+bootmenu)
+社区 SPL 重编: FIT 读取偏移 16384→24576 (CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR)
+eMMC gap = 社区 loader(新SPL) → bootmenu:
+    TF/USB → 主线 extlinux ✓
+    eMMC-Android 菜单项 = mmc read vendor FIT@16384 + bootm 链式引导
+      (FIT firmware=atf-1(vendor BL31), loadables=uboot/optee/atf-2/3
+       mainline U-Boot bootm 加载全部 loadables 并跳 atf-1 入口
+       → BL31 v2.3 → vendor U-Boot → Android ✓)
+boot0/1 = 空(原厂) — BootROM: eMMC-boot0空跳过 → eMMC user gap(社区SPL) 或 TF
+```
+
+### 当前盒子状态
+- FIT@16384 = vendor（完整有效，哈希全过）但社区 SPL 加载它→交接挂死
+- 恢复主线：maskrom 写回 FIT@16384 = 社区 v1.48 FIT（boot-region-eMMC.bin 的对应段）
+- Android 恢复：uboot_a 无需动（vendor FIT 完好）+ gap 换回 vendor loader 即可
