@@ -47,3 +47,9 @@
 2. BL31 能力: Android trust v2.3 vs 我们的 rkbin v1.48 — sip_hdmirx_config
   (AUTO_TOUCH/REG_PRE_FETCH)在 v1.48 是否实现, 缺失则换 Android 的 trust.img 到主线链
 3. 主线 snps_hdmirx(非 vendor 移植版)在标准资源下按 Junklords 思路再试一次
+
+## 2026-11-24 收尾状态
+- 盒子: 主线运行稳定(vendor驱动已拉黑防楔死; mu_st=0根因=PHY寄存器文件无人写入)
+- 三启动: TF/USB主线✓; Android 待A/B双FIT实施(设计见 UNDISCLOSED-CODE-DECODED.md)
+- HDMI-in主线: 根因链全闭环; 修复=驱动内实现表写入(参数表已提取 phy-tables/)
+- 当前eMMC: gap=社区loader(v1.48链) + uboot_a=vendor FIT(完好)
