@@ -20,6 +20,27 @@
 
 	compatible = "rockchip,rk3588-tvi2340r", "rockchip,rk3588";
 
+	/* PMU0 GRF reboot-mode: 与 U-Boot 0003 补丁配对,支持 reboot sd/emmc/usb/loader。
+	 * 来源: DeepSeek 镜像 DTB (syscon@fd588000), 公开仓 dts 同步 v85 时缺失, 此处补回。 */
+	pmu0_grf: syscon@fd588000 {
+		compatible = "rockchip,rk3588-pmu0-grf", "syscon", "simple-mfd";
+		reg = <0x0 0xfd588000 0x0 0x2000>;
+
+		reboot-mode {
+			compatible = "syscon-reboot-mode";
+			offset = <0x80>;
+			mode-bootloader = <0x5242c301>;
+			mode-loader = <0x5242c301>;
+			mode-normal = <0x5242c300>;
+			mode-recovery = <0x5242c303>;
+			mode-emmc = <0x5242c311>;
+			mode-nvme = <0x5242c310>;
+			mode-sd = <0x5242c312>;
+			mode-tf = <0x5242c312>;
+			mode-usb = <0x5242c313>;
+		};
+	};
+
 	adc-keys {
 		compatible = "adc-keys";
 		io-channels = <&saradc 1>;
@@ -100,6 +121,7 @@
 		status = "okay";
 	};
 
+	/* eDP 背光: 与已验证镜像对齐, 默认 disabled (eDP0 实验链, SSH 迭代期再启用) */
 	backlight_edp: backlight-edp {
 		compatible = "pwm-backlight";
 		brightness-levels = <0 20 21 22 24 26 28 31 34 38 42 47 52 58
@@ -110,7 +132,7 @@
 		pinctrl-0 = <&edp_backlight_en>;
 		power-supply = <&vcc_3v3_s3>;
 		pwms = <&pwm6 0 25000 0>;
-		status = "okay";
+		status = "disabled";
 	};
 
 	chosen {
@@ -211,6 +233,7 @@
 		status = "okay";
 	};
 
+	/* typec-extcon 桥: 已验证镜像未包含 (Alt-Mode 实验节点, SSH 迭代期再启用)
 	typec_extcon_bridge: typec-extcon {
 		compatible = "linux,typec-extcon-bridge";
 		mode-switch;
@@ -218,6 +241,7 @@
 		usb-role-switch;
 		svid = /bits/ 16 <0xff01>;
 	};
+	*/
 
 	lvds_pwr_en: regulator-lvds-pwr-en {
 		compatible = "regulator-fixed";
@@ -230,6 +254,7 @@
 		regulator-boot-on;
 	};
 
+	/* LT6911UXC2/HDMI-in 支路总电源 (2026-11-20 实证: 拉高后固件启动、TMDS 锁定) */
 	mipi_cam_pwen: regulator-mipi-cam-pwen {
 		compatible = "regulator-fixed";
 		enable-active-high;
@@ -580,11 +605,12 @@
 &edp0 {
 	/*
 	 * eDP0 is a factory-supported optional internal panel route on VP2.
-	 * Keep HPD/AUX dynamic so an unpopulated assembly is reported as
-	 * disconnected rather than as a phantom connected panel.
+	 * 已验证镜像中 eDP0 = disabled（无 aux-bus 面板子树）。本复现镜像对齐之；
+	 * aux-bus 面板实验链保留在注释中，SSH 迭代期（fdtput/overlay）再启用。
 	 */
-	status = "okay";
+	status = "disabled";
 
+	/*
 	aux-bus {
 		panel {
 			compatible = "edp-panel";
@@ -603,8 +629,10 @@
 			};
 		};
 	};
+	*/
 };
 
+/* eDP0 端点接线: 已验证镜像无 (随 eDP0 实验链整体禁用)
 &edp0_in {
 	edp0_in_vp2: endpoint {
 		remote-endpoint = <&vp2_out_edp0>;
@@ -616,6 +644,7 @@
 		remote-endpoint = <&panel_in_edp>;
 	};
 };
+*/
 
 &gmac0 {
 	clock_in_out = "output";
@@ -661,9 +690,44 @@
 };
 
 &hdmi_receiver {
-	/* Primary HDMI input, handled directly by RK3588's SoC HDMIRX. */
+	/*
+	 * Primary HDMI input, handled by the ported Rockchip vendor HDMIRX
+	 * driver (rockchip-hdmirx-vendor).  Property set mirrors the vendor
+	 * DT verified working on this box: the "hdmi" interrupt is the
+	 * FIQ-routed GIC_SPI 436 and the controller needs its own
+	 * reg-names/clock/reset-name scheme.
+	 */
+	compatible = "rockchip,rk3588-hdmirx-ctrler", "rockchip,hdmirx-ctrler";
+	reg-names = "hdmirx_regs";
+	interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH 0>,
+		     <GIC_SPI 436 IRQ_TYPE_LEVEL_HIGH 0>,
+		     <GIC_SPI 179 IRQ_TYPE_LEVEL_HIGH 0>;
+	interrupt-names = "cec", "hdmi", "dma";
+	clocks = <&cru ACLK_HDMIRX>, <&cru CLK_HDMIRX_AUD>,
+		 <&cru CLK_CR_PARA>, <&cru PCLK_HDMIRX>,
+		 <&cru CLK_HDMIRX_REF>, <&cru PCLK_S_HDMIRX>,
+		 <&cru HCLK_VO1>;
+	clock-names = "aclk",
+		      "audio",
+		      "cr_para",
+		      "pclk",
+		      "ref",
+		      "hclk_s_hdmirx",
+		      "hclk_vo1";
+	resets = <&cru SRST_A_HDMIRX>, <&cru SRST_P_HDMIRX>,
+		 <&cru SRST_HDMIRX_REF>, <&cru SRST_A_HDMIRX_BIU>,
+		 <&cru SRST_A_HDMIRX>, <&cru SRST_P_HDMIRX>,
+		 <&cru SRST_HDMIRX_REF>, <&cru SRST_A_HDMIRX_BIU>;
+	reset-names = "rst_a", "rst_p", "rst_ref", "rst_biu",
+		      "axi", "apb", "ref", "biu";
+	power-domains = <&power RK3588_PD_VO1>;
+	rockchip,grf = <&sys_grf>;
+	rockchip,vo1_grf = <&vo1_grf>;
+	memory-region = <&hdmi_receiver_cma>;
+	hdmirx-det-gpios = <&gpio4 RK_PC6 GPIO_ACTIVE_LOW>;
 	hpd-gpios = <&gpio4 RK_PC6 GPIO_ACTIVE_LOW>;
 	hpd-is-active-low;
+	hpd-trigger-level = <1>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&hdmim1_rx_cec &hdmim1_rx_hpdin
 		     &hdmim1_rx_scl &hdmim1_rx_sda &hdmirx_hpd>;
@@ -757,7 +821,7 @@
 };
 
 &i2c4 {
-	clock-frequency = <400000>;
+	clock-frequency = <100000>; /* 工厂基准: Android 实测 100kHz */
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c4m1_xfer>;
 	status = "okay";
@@ -765,7 +829,8 @@
 	lt9211: bridge@2d {
 		compatible = "lontium,lt9211";
 		reg = <0x2d>;
-		reset-gpios = <&gpio3 RK_PA6 GPIO_ACTIVE_HIGH>;
+		/* reset-gpios 移除: 实测 enable 期复位脉冲会使芯片从总线上消失;
+		 * 复位改由下方 gpio-hog 恒高(=Android 生态位: 上电即释放, 永不重打) */
 		status = "okay";
 		vccio-supply = <&vcc_1v8_s3>;
 
@@ -845,6 +910,7 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&lt6911_pins>;
 		power-domains = <&power RK3588_PD_VI>;
+		power-supply = <&mipi_cam_pwen>;
 		rockchip,camera-module-index = <1>;
 		rockchip,camera-module-facing = "back";
 		rockchip,camera-module-name = "lt6911uxc2";
@@ -863,11 +929,12 @@
 		compatible = "hynetek,husb311";
 		reg = <0x4e>;
 		interrupt-parent = <&gpio0>;
-		interrupts = <RK_PD7 IRQ_TYPE_LEVEL_LOW>;
+		/* 工厂为 GPIO0_B7; D7 引发中断风暴(typec-dp 报告实证), 2026-11-17 修正 */
+		interrupts = <RK_PB7 IRQ_TYPE_LEVEL_LOW>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&usbc0_int>;
 		vbus-supply = <&vbus5v0_typec>;
-		extcon = <&typec_extcon_bridge>;
+		/* extcon = <&typec_extcon_bridge>;  ← 已验证镜像无 extcon 桥引用 */
 		status = "okay";
 
 		connector {
@@ -1023,7 +1090,7 @@
 				     "brcm,bcm43752-fmac",
 				     "brcm,bcm4329-fmac";
 			reg = <0x410000 0 0 0 0>;
-			clocks = <&wifi_lpo>;
+			clocks = <&hym8563>; /* RTC CLKOUT 32.768kHz → AP6275P LPO (2026-11-18 实证) */
 			clock-names = "lpo";
 		};
 	};
@@ -1186,7 +1253,7 @@
 
 	usb {
 		usbc0_int: usbc0-int {
-			rockchip,pins = <0 RK_PD7 RK_FUNC_GPIO &pcfg_pull_up>;
+			rockchip,pins = <0 RK_PB7 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
 
 		typec5v_pwren: typec5v-pwren {
@@ -1210,6 +1277,26 @@
 		gpios = <RK_PC0 GPIO_ACTIVE_HIGH>;
 		output-high;
 		line-name = "vcc1v8_sys_en";
+	};
+};
+
+/* I2C4 设备组总使能: 触摸/RTC 支路电源(或缓冲)使能, Android 由 vendor 驱动拉高,
+ * 主线无驱动持有导致两设备物理性不应答(2026-11-17 位摆 A/B 实验定案) */
+&gpio1 {
+	i2c4-dev-en-hog {
+		gpio-hog;
+		gpios = <RK_PD0 GPIO_ACTIVE_HIGH>;
+		output-high;
+		line-name = "i2c4-dev-en";
+	};
+};
+
+&gpio3 {
+	lt9211-rst-hold-hog {
+		gpio-hog;
+		gpios = <RK_PA6 GPIO_ACTIVE_HIGH>;
+		output-high;
+		line-name = "lt9211-rst-hold";
 	};
 };
 
@@ -1710,12 +1797,14 @@
 	};
 };
 
+/* eDP0 VP2 出口: 已验证镜像无此端点 (随 eDP0 实验链整体禁用)
 &vp2 {
 	vp2_out_edp0: endpoint@ROCKCHIP_VOP2_EP_EDP0 {
 		reg = <ROCKCHIP_VOP2_EP_EDP0>;
 		remote-endpoint = <&edp0_in_vp2>;
 	};
 };
+*/
 
 &vp3 {
 	vp3_out_dsi1: endpoint@ROCKCHIP_VOP2_EP_MIPI1 {

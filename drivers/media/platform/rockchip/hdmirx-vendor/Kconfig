@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config VIDEO_ROCKCHIP_HDMIRX_VENDOR
+	tristate "Rockchip RK3588 HDMI Receiver driver (vendor port)"
+	depends on ARCH_ROCKCHIP
+	depends on VIDEO_DEV
+	depends on V4L_PLATFORM_DRIVERS
+	select MEDIA_CONTROLLER
+	select VIDEOBUF2_DMA_CONTIG
+	select V4L2_FWNODE
+	select VIDEO_V4L2_SUBDEV_API
+	select CEC_CORE
+	select HDMI
+	help
+	  Port of the Rockchip vendor RK3588 HDMI RX driver (rk_hdmirx from
+	  the rockchip-linux vendor kernel) to mainline.  It registers a
+	  V4L2 video capture device for the on-SoC HDMI receiver and uses
+	  Rockchip BL31 SMC calls (FIQ routing, watchdog, HDCP shared
+	  memory) that the vendor rkbin ATF firmware implements.
+
+	  HDMI audio codec registration and CEC can be trimmed at compile
+	  time; video capture is the primary function of this port.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called rockchip-hdmirx-vendor.
